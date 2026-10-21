@@ -17,9 +17,8 @@ VocalRadio/
 ├─ playlist.txt        # 歌单（JSON 数组）—— 播放器直接读它，这是唯一来源
 ├─ color-thief.min.js  # 封面取色
 ├─ assets/
-│  ├─ main.js          # 播放器逻辑
-│  ├─ style.css        # 播放器样式（含随封面取色的动态配色）
-│  └─ editorial.css    # 博客的全站风格层副本（纸白/墨黑/细线）
+│  ├─ main.js          # 播放器逻辑（歌单/取色/歌词滚动/进度/点赞）
+│  └─ style.css        # 卡片式视觉系统（模糊封面背景 + 玻璃播放条）
 ├─ functions/          # 后端：Pages Functions + D1，随仓库一起部署
 │  ├─ schema.sql       # D1 建表语句（三条，网页 Console 里逐条执行）
 │  └─ api/             # 点赞/播放计数接口
@@ -143,13 +142,36 @@ npx wrangler pages deploy . --project-name vocalradio
 
 ## 与博客的关系
 
-- 页面左上角的「← 返回玖桐博客」硬编码在 `index.html`，目前指向 `https://yunjiutong.cn/`。
-- `assets/editorial.css` 是博客 `asset/editorial.css` 的**副本**，拆站后不能再跨目录引用。
-  博客改了全站风格后同步一次：
+- 页面左上角的「‹ 玖桐博客」硬编码在 `index.html`，目前指向 `https://yunjiutong.cn/`。
+- 拆站后**样式完全独立**，不再引用博客的 `editorial.css`（原先那份副本已删除）。
+  博客是全站「个人刊物」风格，电台是卡片式界面，两套视觉各管各的。
 
-  ```bash
-  cp ../YunjiutongBlog/asset/editorial.css assets/editorial.css
-  ```
+## 界面结构
+
+```
+模糊封面背景（cover/thumb 里的低清图，fixed 铺满 + blur）
+├─ 导航卡片（玻璃）      返回博客 · 站点名 · 深/浅主题开关
+├─ 正在播放卡片          封面 + 序号 + 曲名 + 歌手
+├─ 歌词卡片              卡片内独立滚动，当前行居中高亮
+├─ 歌单卡片              23 首，点任意一行即播
+└─ 播放条卡片（磨砂玻璃，fixed 贴底）
+                         进度条 + 上一首/播放/下一首 + 点赞 + 音量
+```
+
+几条设计约束，改样式时别破坏：
+
+- **主题色只来自封面取色**：`main.js` 把 color-thief 的结果算成色相/饱和度写进
+  `--accent-h` / `--accent-s`，CSS 里派生出 `--accent-ink`（文字/描边）、
+  `--accent-fill`（实心按钮）。换歌 → 换主题色，全站跟着变。
+- **深/浅主题只换配色，不碰背景**：背景层 `.ambient` 不参与主题切换，
+  两套主题共用同一张模糊封面。切换只改卡片底色、文字、主题色明度。
+- **歌词高亮不做缩放**：只用颜色 + 字重 + 底色，且滚动只发生在 `#lyricBox` 内部
+  （`scrollTop`），**不要用 `scrollIntoView`** —— 那会把整个页面滚走，
+  就是之前"高亮时超出显示屏"的根因。
+- **响应式**：桌面两列（封面 / 歌词）+ 歌单通栏；≤1024 单列、正在播放横排；
+  ≤720 手机紧凑版。页面纵向滚动，没有任何固定画布或 `overflow:hidden` 裁切。
+- **可访问性**：语义标签 + `aria-label`/`aria-pressed`/`aria-current`、
+  Tab 焦点环（3px 主题色）、首个 Tab 是「跳到播放控件」、滑杆都有 `<label>`。
 
 ## 体积与平台限制
 
