@@ -1,0 +1,22 @@
+# 术力口电台后端：Cloudflare Worker + D1
+# 部署：在仓库根目录执行 `npx wrangler deploy --config worker/wrangler.toml`
+
+name = "vocalradio-api"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# ── D1 ────────────────────────────────────────────────────────────────
+# 先创建数据库：npx wrangler d1 create vocalradio
+# 再把输出里的 database_id 填到下面（替换全 0 的占位值）。
+# 本地调试（--local）用不到真实 id，可以直接跑。
+[[d1_databases]]
+binding = "DB"
+database_name = "vocalradio"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# ── 域名 ──────────────────────────────────────────────────────────────
+# 原 Worker 用的就是 likes.yunjiutong.cn。
+# 如果该域名已在 Dashboard 里绑定到这个 Worker，删掉下面这段，避免重复声明冲突。
+routes = [
+  { pattern = "likes.yunjiutong.cn", custom_domain = true }
+]

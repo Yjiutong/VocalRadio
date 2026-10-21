@@ -22,14 +22,21 @@ VocalRadio/
 ├─ cover/              # 封面原图（约 53MB）
 │  └─ thumb/           # 封面缩略图，先出低清再换高清
 ├─ lyric/              # 歌词 .lrc
-└─ music/              # 音频 .mp3（约 167MB）
+├─ music/              # 音频 .mp3（约 167MB）
+└─ worker/             # 后端（Cloudflare Worker + D1）：歌单与点赞计数
+   ├─ src/index.js
+   ├─ schema.sql
+   ├─ wrangler.toml
+   └─ README.md        # 部署与迁移步骤
 ```
 
 ## 数据来源
 
-| 能力 | 来源 |
+歌曲与点赞/播放计数都在 **D1**（见 `worker/README.md`），Worker 对外只暴露这几个接口：
+
+| 能力 | 接口 |
 |---|---|
-| 歌单 | `https://likes.yunjiutong.cn/api/random` 返回 `{ list: [...] }` |
+| 歌单 | `GET https://likes.yunjiutong.cn/api/random` → `{ list: [...] }` |
 | 播放数 | `GET /api/play?key=<文件名>` |
 | 点赞 | `GET /api/like?key=`、`GET /api/getLike?key=`、`GET /api/allLikes` |
 
@@ -51,8 +58,19 @@ cover/thumb/23_歌手_曲名.png     # 低清缩略图，可缩小到 400px
 lyric/23_歌手_曲名.lrc
 ```
 
-然后把 `23_歌手_曲名.mp3` 加进 `playlist.txt` 的数组，并同步到线上歌单接口，
-否则网页仍然不会播放到它（歌单以接口为准，`playlist.txt` 只是兜底）。
+歌曲是否会被播放，由后端 D1 的 `songs` 表决定；仓库里的 `playlist.txt` 只是接口故障时的兜底快照。
+所以两处都要加：
+
+```bash
+# 1) 写进后端数据库（否则网页永远播不到这首）
+npx wrangler d1 execute vocalradio --remote --config worker/wrangler.toml \
+  --command "INSERT INTO songs (filename, song_id, singer, title) VALUES ('23_歌手_曲名.mp3','23','歌手','曲名')"
+
+# 2) 同步兜底快照 playlist.txt 的数组
+```
+
+> 部署 Pages 时 `worker/` 目录也会被一起当作静态文件发布（源码可被访问，但不含任何密钥）。
+> 介意的话可以把 `worker/` 拆到单独仓库，本仓库只保留前端。
 
 ## 部署
 
