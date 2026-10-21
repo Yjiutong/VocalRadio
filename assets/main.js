@@ -1,5 +1,7 @@
-// ========== 配置区【修正为你真实worker地址，只定义一次！】 ==========
-const API_BASE = "https://likes.yunjiutong.cn";
+// ========== 配置区 ==========
+// 计数接口和页面同源（functions/api/*.js，随仓库一起部署），所以留空即可。
+// 如果哪天改回独立 Worker，把它填成那个域名，例如 "https://likes.yunjiutong.cn"。
+const API_BASE = "";
 
 // DOM元素
 const themeBtn = document.querySelector("#theme");

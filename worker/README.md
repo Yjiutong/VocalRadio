@@ -1,5 +1,11 @@
 # 术力口电台后端 · Worker + D1
 
+> **这是「方案 A（可选）」，当前线上不用它。**
+> 默认方案是仓库根目录的 `functions/api/`（Pages Functions），和页面一起部署、
+> 同源、加接口不用进后台。两者读写同一张 D1 表、接口路径完全一致，
+> 切换只改 `assets/main.js` 的 `API_BASE`：`""` = Pages Functions，`"https://likes.yunjiutong.cn"` = 本 Worker。
+> **除非你确定要独立域名，否则不用管这个目录，只要执行 `schema.sql` 建表即可。**
+
 `likes.yunjiutong.cn` 的实现，**只负责点赞 / 播放计数**。
 
 ## 歌单不在数据库里

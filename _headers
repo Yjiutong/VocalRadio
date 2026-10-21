@@ -1,10 +1,10 @@
 # 电台站（独立部署）· Cloudflare Pages 响应头
-# 站点根目录 = 本 radio/ 目录，因此路径不带 /radio/ 前缀。
+# 站点根目录 = 本仓库根目录，因此路径不带 /radio/ 前缀。
 # 说明：这三类资源必须带 Access-Control-Allow-Origin，
 #   1) <audio crossorigin="anonymous"> 需要音频响应允许跨域；
 #   2) color-thief 用 canvas 读封面取色，图片响应必须允许跨域，
 #      否则 canvas 被污染、取色直接抛错。
-# 点赞/播放量接口在 https://likes.yunjiutong.cn（CORS 为 *），与本项目无关。
+# 点赞/播放量接口是本站同源的 /api/*（functions/api/），不跨域，这里不用管。
 
 # ---- 音频 ----
 /music/*
