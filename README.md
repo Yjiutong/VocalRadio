@@ -122,10 +122,17 @@ npx wrangler pages deploy . --project-name vocalradio
 
 Pages 跑通之后，`likes.yunjiutong.cn` 那个 Worker 就没用了，可以删。**必须先验证再删**：
 
+> **⚠️ 前提：博客那边的 `/radio/` 得先下线。**
+> 截至 2026-10-21，`https://yunjiutong.cn/radio/radio` 仍然在线，它的 `assets/main.js` 里
+> `API_BASE = "https://likes.yunjiutong.cn"`，而且还在调 `/api/random` 拿歌单 ——
+> 也就是说**删掉 Worker，博客上那个还在跑的电台会立即不能选歌、点赞和播放计数全挂**。
+> 顺序必须是：新站部署通 → 博客 push 下掉 `/radio/`（入口已由 `tools/set-radio-url.mjs` 改写）→ 再删 Worker。
+
 1. Pages 部署成功，`/api/songs` 返回 `{"list":[]}`（说明 Functions + D1 绑定都通了）；
 2. 在页面上真点一次赞 → `/api/like` 返回 `count:1` → D1 Console 里
    `SELECT * FROM songs;` 能看到那一行（说明真的写进库了，不是只返回了个数字）；
-3. 到这一步才去删 Worker。
+3. 博客 `/radio/` 已下线并部署（旧访客的 `main.js` 可能还在缓存里，建议留一两天再删）；
+4. 到这一步才去删 Worker。
 
 删的时候注意：
 
