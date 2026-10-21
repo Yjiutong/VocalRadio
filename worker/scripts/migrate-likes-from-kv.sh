@@ -24,7 +24,9 @@ while IFS= read -r f; do
   raw=$($WRANGLER kv key get "like_$f" --namespace-id "$KV_NAMESPACE_ID" --remote 2>/dev/null | tr -d '\r\n' || true)
   if [[ "$raw" =~ ^[0-9]+$ ]]; then n="$raw"; else n=0; fi
   esc=${f//\'/\'\'}
-  printf "UPDATE songs SET likes = %s WHERE filename = '%s';\n" "$n" "$esc" >>"$OUT"
+  # 新表是「按需建行」，很多歌还没有行，所以必须用 INSERT ... ON CONFLICT，
+  # 单纯 UPDATE 会命中 0 行、计数直接丢掉。
+  printf "INSERT INTO songs (filename, likes) VALUES ('%s', %s) ON CONFLICT(filename) DO UPDATE SET likes = excluded.likes;\n" "$esc" "$n" >>"$OUT"
   printf '  %-52s %s\n' "$f" "$n"
 done < <(grep -o '"[^"]*\.mp3"' "$PLAYLIST" | tr -d '"')
 
