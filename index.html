@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>术力口电台</title>
+    <meta name="description" content="术力口电台：VOCALOID 歌曲播放器，带滚动歌词与点赞。">
+    <meta name="theme-color" content="#39c5bb">
+    <meta property="og:title" content="术力口电台">
+    <meta property="og:description" content="VOCALOID 歌曲播放器，带滚动歌词与点赞。">
+    <meta property="og:type" content="website">
+    <link rel="icon" type="image/png" href="./cover/default.png">
+    <link rel="stylesheet" href="./assets/style.css">
+    <link rel="stylesheet" href="./assets/editorial.css">
+</head>
+<body class="radio-page">
+    <div class="top-bar">
+        <a class="back-home" href="https://yunjiutong.cn/" target="_blank" rel="noopener">← 返回玖桐博客</a>
+        <button id="theme">切换主题</button>
+    </div>
+    <div class="container">
+        <div class="card">
+            <div class="media-card">
+                <div class="radio-cover-wrap">
+                    <img id="coverImg" class="radio-cover" src="./cover/default.png" alt="">
+                </div>
+                <div class="radio-right">
+                    <div class="text-scroll-mask">
+                        <div id="songTitle" class="song-title"></div>
+                    </div>
+                    <div class="text-scroll-mask">
+                        <div id="songArtist" class="song-artist"></div>
+                    </div>
+                    <div class="lyric-box">
+                        <div id="lyricWrap" class="lyric-wrap">暂无歌词~</div>
+                    </div>
+                    <div class="control-group">
+                        <button class="btn-icon" id="btnPrev">
+                            <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" /></svg>
+                        </button>
+                        <button class="btn-icon btn-play" id="btnPlay">
+                            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                        </button>
+                        <button class="btn-icon" id="btnNext">
+                            <svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+                        </button>
+                        <div class="like-wrap">
+                            <button class="btn-icon" id="btnLike">
+                                <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+                            </button>
+                            <span id="likeCountText" class="like-count-text">0</span>
+                        </div>
+                        <div class="volume-control" id="volumeControl">
+                            <button class="btn-icon btn-mute" id="btnMute" title="音量">
+                                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                            </button>
+                            <div class="volume-popover" id="volumePopover">
+                                <input type="range" id="volumeSlider" min="0" max="100" step="1" value="80">
+                                <span class="volume-text" id="volumeText">80%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <audio id="audioPlayer" preload="metadata" crossorigin="anonymous" playsinline></audio>
+    <script src="./color-thief.min.js"></script>
+    <script src="./assets/main.js"></script>
+</body>
+</html>

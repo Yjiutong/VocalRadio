@@ -1,0 +1,15 @@
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# 部署与构建缓存（wrangler pages deploy 会在本地生成）
+.wrangler/
+node_modules/
+dist/
+
+# 日志与临时文件
+*.log
+*.tmp

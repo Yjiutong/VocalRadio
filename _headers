@@ -1,0 +1,41 @@
+# 电台站（独立部署）· Cloudflare Pages 响应头
+# 站点根目录 = 本 radio/ 目录，因此路径不带 /radio/ 前缀。
+# 说明：这三类资源必须带 Access-Control-Allow-Origin，
+#   1) <audio crossorigin="anonymous"> 需要音频响应允许跨域；
+#   2) color-thief 用 canvas 读封面取色，图片响应必须允许跨域，
+#      否则 canvas 被污染、取色直接抛错。
+# 点赞/播放量接口在 https://likes.yunjiutong.cn（CORS 为 *），与本项目无关。
+
+# ---- 音频 ----
+/music/*
+  Content-Type: audio/mpeg
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=2592000
+
+# ---- 封面（含 thumb 缩略图）----
+/cover/*
+  Content-Type: image/png
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=2592000
+
+# ---- 歌词 ----
+/lyric/*
+  Content-Type: text/plain;charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=604800
+
+# ---- 脚本 ----
+/assets/*.js
+  Content-Type: application/javascript;charset=utf-8
+
+/*.js
+  Content-Type: application/javascript;charset=utf-8
+
+# ---- 本地歌单兜底：短缓存，改了要及时生效 ----
+/playlist.txt
+  Content-Type: application/json;charset=utf-8
+  Cache-Control: public, max-age=300
+
+# ---- 样式：始终回源校验，改版即时生效 ----
+/*.css
+  Cache-Control: public, max-age=0, must-revalidate

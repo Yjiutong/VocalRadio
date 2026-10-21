@@ -1,0 +1,404 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+:root {
+    /* Miku默认兜底配色，JS运行时覆盖 */
+    --dyn-color1: rgb(14, 58, 56);
+    --dyn-color2: rgb(220, 248, 246);
+    --dyn-rgb1: 14, 58, 56;
+    --dyn-rgb2: 220, 248, 246;
+    color-scheme: light;
+    --page-bg: var(--dyn-color2);
+    --text-color: var(--dyn-color1);
+    --text-secondary: rgba(var(--dyn-rgb1), 0.72);
+    --surface: rgba(255, 255, 255, 0.18);
+    --radius: 20px;
+    --border: rgba(var(--dyn-rgb1), 0.16);
+    --shadow-normal: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+/* 修复！主题挂载在html根节点 :root，不要写body */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg: var(--dyn-color1);
+    --text-color: var(--dyn-color2);
+    --text-secondary: rgba(var(--dyn-rgb2), 0.78);
+    --surface: rgba(0, 0, 0, 0.22);
+    --border: rgba(var(--dyn-rgb2), 0.14);
+    --shadow-normal: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+body.empty-state {
+    background: rgb(57, 197, 187);
+    color: #ffffff;
+}
+body.empty-state .card {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+body.empty-state .song-title,
+body.empty-state .song-artist,
+body.empty-state .lyric-wrap {
+    color: #ffffff;
+}
+body.empty-state .back-home {
+    color: #ffffff;
+}
+body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Helvetica Neue, sans-serif;
+    min-height: 100vh;
+    background: var(--page-bg);
+    color: var(--text-color);
+    transition: background 0.4s ease, color 0.4s ease;
+}
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+}
+.back-home {
+    color: var(--text-color);
+    text-decoration: none;
+    font-size: 16px;
+}
+/* 昼夜按钮：加粗 hover放大1.05 */
+#theme {
+    font-weight: 700;
+    border: 1px solid color-mix(in srgb, var(--text-color) 65%, transparent);
+    background: color-mix(in srgb, var(--text-color) 18%, var(--surface));
+    color: var(--text-color);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.25s ease, transform 0.18s ease;
+}
+#theme:hover {
+    transform: scale(1.05);
+    background: var(--text-color);
+    color: var(--page-bg);
+    border-color: var(--text-color);
+}
+.container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: calc(100vh - 80px);
+    padding: 12px;
+}
+.card {
+    width: min(920px, calc(100vw - 24px));
+    background: color-mix(in srgb, var(--text-color) 12%, var(--page-bg));
+    backdrop-filter: blur(14px);
+    border-radius: var(--radius);
+    padding: 24px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-normal);
+    overflow: visible;
+}
+
+.radio-inner {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap; /* ✅手机屏幕太窄自动换行，封面跑到上方，不会硬挤一行 */
+}
+/* media-card 作为cqw容器查询的父级 */
+.media-card {
+    container-type: inline-size;
+    width: 100%;
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 22px;
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--text-color) 6%, var(--page-bg));
+    box-shadow:
+        0 8px 28px rgba(0, 0, 0, 0.16),
+        0 2px 8px rgba(0, 0, 0, 0.08),
+        inset 0 0 0 1px var(--border);
+    backdrop-filter: blur(10px);
+    transition: background 0.4s ease, box-shadow 0.4s ease;
+    min-width: 0;
+    overflow: visible;
+}
+:root[data-theme="dark"] .media-card {
+    box-shadow:
+        0 8px 28px rgba(0, 0, 0, 0.34),
+        0 2px 8px rgba(0, 0, 0, 0.18),
+        0 0 22px rgba(80, 220, 210, 0.10);
+}
+/* 封面容器：强制1:1正方形，基于media‑card容器自动缩放，设置上下限，不会溢出 */
+/* 外层容器：固定正方形，控制封面整体大小 */
+.radio-cover-wrap {
+  width: 240px;
+  /* 删除写死height，改用aspect‑ratio强制1:1正方形 */
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.radio-cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+.radio-inner {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  justify-content: center; /* 手机换行之后，封面整体居中，和截图UI匹配 */
+}
+
+@media (max-width: 640px) {
+  .radio-cover-wrap {
+    width: 160px;
+    /* aspect‑ratio继承1/1，自动得到160px高度，保证正方形 */
+  }
+}
+.radio-right {
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    align-items: center;
+    text-align: center;
+}
+.text-scroll-mask {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+.song-title {
+    font-size: clamp(18px, 2.6cqw, 24px);
+    font-weight: 700;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    transition: transform 0.18s ease, color 0.4s ease;
+    text-align: center;
+}
+.song-title:hover {
+    transform: scale(1.05);
+}
+.song-artist {
+    font-size: clamp(14px, 2cqw, 16px);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    transition: transform 0.18s ease, color 0.4s ease;
+    text-align: center;
+}
+.song-artist:hover {
+    transform: scale(1.05);
+}
+.scroll-marquee {
+    display: inline-block;
+    animation: marquee 9s linear infinite;
+}
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(-50%); }
+    100% { transform: translateX(0); }
+}
+/* 歌词框：背景10%透明度，无边框，磨砂，hover放大 */
+.lyric-box {
+    width: 100%;
+    height: clamp(140px, 22cqw, 200px);
+    overflow: hidden;
+    background: color-mix(in srgb, var(--text-color) 10%, var(--page-bg));
+    border: none;
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.18s ease, background 0.4s ease;
+    margin: 0 auto;
+}
+.lyric-box:hover {
+    transform: scale(1.05);
+}
+.lyric-wrap {
+    width: 100%;
+    max-height: 100%;
+    text-align: center;
+    line-height: 1.7;
+    overflow: hidden;
+    color: var(--text-color);
+}
+.lyric-line {
+    margin: 3px 0;
+    color: var(--text-color);
+    opacity: 0.85;
+    transition: all 0.25s;
+}
+.lyric-line.active {
+    font-weight: 800;
+    opacity: 1;
+    transform: scale(1.05);
+}
+.control-group {
+    display: flex;
+    gap: clamp(6px,2cqw,12px);
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+}
+/* 圆形按钮，基于media-card容器cqw自动适配；宽高完全相等保证永久正圆 */
+.btn-icon {
+    width: clamp(34px,11cqw,50px);
+    height: clamp(34px,11cqw,50px);
+    border-radius: 50%;
+    border: none;
+    background: rgba(var(--dyn-rgb1), 0.22);
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.18s ease, background 0.3s ease, color 0.3s ease;
+    flex: 0 0 auto;
+}
+.btn-icon:hover {
+    transform: scale(1.05);
+}
+.btn-icon:active {
+    transform: scale(0.94);
+}
+.btn-play {
+    width: clamp(40px,13cqw,58px);
+    height: clamp(40px,13cqw,58px);
+    background: rgba(var(--dyn-rgb1), 0.72);
+    color: #ffffff;
+}
+/* 夜间模式按钮配色 */
+:root[data-theme="dark"] .btn-icon {
+    background: rgba(var(--dyn-rgb2), 0.18);
+    color: var(--text-color);
+}
+:root[data-theme="dark"] .btn-play {
+    background: rgba(var(--dyn-rgb2), 0.72);
+    color: var(--dyn-color1);
+}
+.btn-icon svg {
+    width: clamp(20px, 3cqw, 24px);
+    height: clamp(20px, 3cqw, 24px);
+    pointer-events: none;
+}
+.btn-play svg {
+    width: clamp(24px, 3.6cqw, 30px);
+    height: clamp(24px, 3.6cqw, 30px);
+    pointer-events: none;
+}
+.like-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.like-count-text {
+    font-size: clamp(14px, 2cqw, 16px);
+    color: var(--text-color);
+}
+/* 音量控件：音量键 + 悬浮音量条（行内，与其他按钮同一排） */
+.volume-control {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 2px;
+}
+/* 音量键与其他播放按钮视觉对齐（尺寸/图标一致） */
+.btn-mute {
+    width: clamp(34px, 11cqw, 50px);
+    height: clamp(34px, 11cqw, 50px);
+}
+.btn-mute svg {
+    width: clamp(20px, 3cqw, 24px);
+    height: clamp(20px, 3cqw, 24px);
+    pointer-events: none;
+}
+.btn-mute.muted {
+    background: rgba(var(--dyn-rgb1), 0.12);
+}
+:root[data-theme="dark"] .btn-mute.muted {
+    background: rgba(var(--dyn-rgb2), 0.12);
+}
+/* 悬浮音量条：默认隐藏，悬浮音量键/音量条时显示 */
+.volume-popover {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 12px);
+    transform: translateX(-50%) translateY(6px);
+    opacity: 0;
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-color) 90%, var(--page-bg));
+    color: var(--page-bg);
+    box-shadow: var(--shadow-normal);
+    white-space: nowrap;
+    z-index: 30;
+    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0s 0.22s;
+}
+.volume-popover.open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+}
+#volumeSlider {
+    width: 110px;
+    height: 6px;
+    margin: 0;
+    accent-color: var(--page-bg);
+    cursor: pointer;
+}
+.volume-text {
+    font-size: clamp(13px, 2cqw, 15px);
+    min-width: 34px;
+    text-align: center;
+    color: var(--page-bg);
+}
+/* 移动端响应式 */
+@media (max-width: 720px) {
+    .radio-inner {
+        flex-direction: column;
+        min-width: 0;
+    }
+    .media-card {
+        flex-direction: column;
+        gap: 16px;
+        padding: 18px;
+        min-width: 0;
+    }
+    .card {
+        padding: 16px;
+    }
+    .radio-cover-wrap {
+        width: clamp(70px,45cqw,200px);
+    }
+    .radio-right {
+        width: 100%;
+        min-width: 0;
+    }
+}
