@@ -54,9 +54,26 @@ songs(filename PK, likes, plays, updated_at)
 
 网页端（当前使用）：
 
-1. D1 → `likes` → **Console**，粘贴 `schema.sql` 全文执行；
+1. D1 → `likes` → **Console**，`schema.sql` 里的三条语句**逐条粘贴执行**（见下方注意）；
 2. 现有 Worker → Settings → Bindings → 添加 **D1 database**，变量名 **`DB`**，选 `likes`；
 3. 同一 Worker → Edit code，粘贴 `src/index.js` 全文 → Deploy。
+
+> **`schema.sql` 特意不写注释，每条语句压成一行。**
+> 网页 Console 提交时换行不一定保留，而 `--` 是行注释、依赖换行终止。
+> 一旦换行被压平，`--` 之后的整段真实 DDL 会被当成注释吞掉，SQLite 拿到一句在
+> 括号中间截断的 `CREATE TABLE`，报错 **`incomplete input: SQLITE_ERROR`**（已用真实
+> SQLite 复现确认）。所以改这个文件时**不要在语句中间或语句之间加注释**，说明写在本文件里。
+
+三条语句，可原样逐条粘贴：
+
+```sql
+DROP TABLE IF EXISTS songs;
+CREATE TABLE songs (filename TEXT PRIMARY KEY, likes INTEGER NOT NULL DEFAULT 0, plays INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL DEFAULT (datetime('now')));
+CREATE INDEX idx_songs_likes ON songs (likes DESC);
+```
+
+执行完在 Console 里跑 `SELECT name FROM sqlite_master WHERE type IN ('table','index');`
+应看到 `songs` 与 `idx_songs_likes` 两行。
 
 命令行：
 
