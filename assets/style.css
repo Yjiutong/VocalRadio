@@ -1,42 +1,41 @@
 /* =============================================================
    术力口电台 · 卡片式播放器
-   结构：模糊封面背景 → 上方圆角卡片（导航 / 正在播放 / 歌词 / 歌单）
-        → 底部磨砂玻璃播放条
-   主题色：由封面取色（color-thief）算出的色相/饱和度，写在 :root 的
-        --accent-h / --accent-s 上；深/浅主题只改这两者的派生值，
-        背景层完全不动。
+   结构：模糊封面背景 → 导航卡片 / 歌词卡片 → 底部「播放器卡片」
+        （封面 + 曲名 + 进度 + 控制 + 可展开歌单，全在一张卡里）
+   主题色：封面取色算出的色相/饱和度，写在 :root 的 --accent-h / --accent-s，
+        深/浅主题只改派生值，背景层完全不动。
    ============================================================= */
 
 /* ---------- 设计变量 ---------- */
 :root {
   color-scheme: light;
 
-  /* 封面取色（JS 运行时覆盖） */
   --accent-h: 174;
   --accent-s: 72%;
 
-  /* 圆角：Apple 风格大圆角 + 内层小圆角 */
   --r-card: 28px;
   --r-inner: 20px;
   --r-pill: 999px;
 
-  /* 素材与描边 */
   --card-bg: rgba(255, 255, 255, 0.86);
-  --card-bg-soft: rgba(255, 255, 255, 0.6);
   --card-line: rgba(255, 255, 255, 0.72);
   --glass-bg: rgba(255, 255, 255, 0.72);
+  /* 歌单是浮在歌词卡片上的一层，背后是密集文字；而播放器卡片本身也是
+     backdrop-filter 宿主（新的 backdrop root），面板的模糊采样不到卡片外的歌词，
+     所以这里只能靠高不透明度压住透出来的字，留 3% 通透感 */
+  --panel-bg: rgba(250, 251, 253, 0.97);
   --glass-line: rgba(255, 255, 255, 0.8);
   --glass-highlight: rgba(255, 255, 255, 0.85);
   --btn-bg: rgba(255, 255, 255, 0.62);
-  --btn-bg-hover: rgba(255, 255, 255, 0.88);
+  --glass-hover: rgba(255, 255, 255, 0.46);
+  --row-hover: rgba(255, 255, 255, 0.7);
   --track: rgba(20, 22, 26, 0.16);
 
-  /* 文字（都按 ≥ 4.5:1 反衬底色挑过） */
   --ink: #14161a;
   --ink-2: #3c424b;
   --ink-3: #4b515a;
 
-  /* 主题色派生：向西黑/白混一点，保证任何色相（尤其黄绿）都有足够对比度 */
+  /* 主题色派生：往黑/白里混一点，保证任何色相（尤其黄绿）都有足够对比度 */
   --accent-ink: color-mix(in srgb, hsl(var(--accent-h) var(--accent-s) 44%) 62%, #0b0d10);
   --accent-fill: color-mix(in srgb, hsl(var(--accent-h) var(--accent-s) 46%) 70%, #0b0d10);
   --on-accent: #ffffff;
@@ -44,7 +43,7 @@
   --accent-glow: hsl(var(--accent-h) var(--accent-s) 45% / 0.34);
 
   --shadow-card: 0 10px 30px rgba(16, 18, 22, 0.12), 0 1px 2px rgba(16, 18, 22, 0.08);
-  --shadow-float: 0 18px 50px rgba(16, 18, 22, 0.22), 0 2px 8px rgba(16, 18, 22, 0.10);
+  --shadow-float: 0 18px 50px rgba(16, 18, 22, 0.24), 0 2px 8px rgba(16, 18, 22, 0.1);
   --blur: 26px;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
@@ -53,13 +52,14 @@
   color-scheme: dark;
 
   --card-bg: rgba(22, 23, 27, 0.84);
-  --card-bg-soft: rgba(30, 31, 36, 0.7);
   --card-line: rgba(255, 255, 255, 0.12);
-  --glass-bg: rgba(18, 19, 23, 0.76);
+  --glass-bg: rgba(18, 19, 23, 0.78);
+  --panel-bg: rgba(19, 20, 24, 0.96);
   --glass-line: rgba(255, 255, 255, 0.16);
   --glass-highlight: rgba(255, 255, 255, 0.12);
   --btn-bg: rgba(255, 255, 255, 0.12);
-  --btn-bg-hover: rgba(255, 255, 255, 0.2);
+  --glass-hover: rgba(255, 255, 255, 0.14);
+  --row-hover: rgba(255, 255, 255, 0.1);
   --track: rgba(255, 255, 255, 0.22);
 
   --ink: #f4f5f7;
@@ -90,8 +90,14 @@ body {
 }
 
 body {
-  min-height: 100vh;
-  min-height: 100dvh;
+  /* 必须是确定高度，不能只用 min-height：min-height 不会让 flex 容器产生
+     可分配的剩余空间，子项就会按内容撑开，歌词容器也就永远滚不起来 */
+  height: 100vh;
+  height: 100dvh;
+  /* 纵向 flex：歌词卡片吃掉播放器上方的全部剩余高度，
+     这样卡片高度是确定的，歌词才能只在自己的容器里滚动 */
+  display: flex;
+  flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
   font-size: 16px;
@@ -99,8 +105,8 @@ body {
   color: var(--ink);
   background: #0d0f12;
   -webkit-font-smoothing: antialiased;
-  /* 给固定播放条留出空间，内容不被遮挡 */
-  padding-bottom: 168px;
+  /* 给固定在底部的播放器卡片留位 */
+  padding: 0 0 190px;
 }
 
 img {
@@ -125,11 +131,10 @@ ol {
   list-style: none;
 }
 
-/* 可见焦点：键盘操作用，鼠标点击不显示 */
 :where(a, button, input, [tabindex]):focus-visible {
   outline: 3px solid var(--accent-ink);
   outline-offset: 3px;
-  border-radius: 8px;
+  border-radius: 10px;
 }
 
 .sr-only {
@@ -144,7 +149,7 @@ ol {
   border: 0;
 }
 
-/* ---------- 背景层：低清封面 + 模糊（深/浅主题共用） ---------- */
+/* ---------- 背景层：低清封面 + 模糊（深浅主题共用） ---------- */
 .ambient {
   position: fixed;
   inset: 0;
@@ -159,8 +164,7 @@ ol {
   width: 120%;
   height: 120%;
   object-fit: cover;
-  /* 低清缩略图被 "放大 + 模糊" 后就是一层色雾，不会看出像素块。
-     模糊半径别开太大：太糊的话卡片上的 backdrop-filter 就看不出"磨砂"了。 */
+  /* 模糊半径别开太大：太糊的话卡片上的 backdrop-filter 就看不出"磨砂"了 */
   filter: blur(32px) saturate(160%) brightness(0.92);
   transform: scale(1.06);
   opacity: 0.95;
@@ -176,7 +180,7 @@ ol {
   inset: 0;
   background:
     radial-gradient(120% 80% at 50% -10%, rgba(255, 255, 255, 0.16), transparent 60%),
-    linear-gradient(180deg, rgba(8, 9, 12, 0.18) 0%, rgba(8, 9, 12, 0.32) 100%);
+    linear-gradient(180deg, rgba(8, 9, 12, 0.18) 0%, rgba(8, 9, 12, 0.34) 100%);
   pointer-events: none;
 }
 
@@ -188,6 +192,10 @@ ol {
   max-width: 1180px;
   margin: 0 auto;
   padding: 20px 24px 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---------- 卡片通用 ---------- */
@@ -203,7 +211,6 @@ ol {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(170%);
 }
 
-/* 磨砂玻璃：更透、更薄、顶部一道高光边 */
 .card--glass {
   background:
     linear-gradient(150deg, color-mix(in srgb, var(--accent-fill) 14%, transparent), transparent 58%),
@@ -230,12 +237,7 @@ ol {
   color: var(--ink-2);
   text-decoration: none;
   font-size: 0.9rem;
-  transition: background 0.2s var(--ease), color 0.2s var(--ease);
-}
-
-.topbar__back:hover {
-  background: var(--btn-bg-hover);
-  color: var(--ink);
+  background: transparent;
 }
 
 .topbar__back svg {
@@ -251,7 +253,6 @@ ol {
   font-weight: 600;
   letter-spacing: 0.02em;
   text-align: center;
-  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -269,15 +270,6 @@ ol {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s var(--ease), transform 0.15s var(--ease);
-}
-
-.chip:hover {
-  background: var(--btn-bg-hover);
-}
-
-.chip:active {
-  transform: scale(0.97);
 }
 
 .chip__icon {
@@ -318,81 +310,28 @@ ol {
   top: 16px;
 }
 
-/* ---------- 主舞台 ---------- */
+/* ---------- 主舞台：只剩歌词卡片 ---------- */
 .stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* 视口很矮时的下限，低于这个高度就让页面滚动 */
+  min-height: 280px;
   display: grid;
-  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  /* 关键：行轨道必须是 minmax(0,1fr)，否则 auto 轨道等于内容高度，
+     卡片会被歌词撑到几千像素、内层根本不滚动 */
+  grid-template-rows: minmax(0, 1fr);
   gap: 18px;
   margin-top: 18px;
-  align-items: stretch;
 }
 
-/* ---------- 正在播放卡片 ---------- */
-.now {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 16px;
-}
-
-.now__cover {
-  border-radius: var(--r-inner);
-  overflow: hidden;
-  aspect-ratio: 1 / 1;
-  background: rgba(120, 120, 128, 0.22);
-  box-shadow: 0 8px 24px rgba(10, 12, 16, 0.22);
-}
-
-.now__cover-img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: opacity 0.35s var(--ease);
-}
-
-.now__meta {
-  min-width: 0;
-  padding: 0 4px 2px;
-}
-
-.now__index {
-  margin-bottom: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent-ink);
-}
-
-.now__title {
-  font-size: clamp(1.25rem, 1.1rem + 0.7vw, 1.6rem);
-  font-weight: 700;
-  line-height: 1.28;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-
-.now__artist {
-  margin-top: 4px;
-  font-size: 0.95rem;
-  color: var(--ink-2);
-  overflow-wrap: anywhere;
-}
-
-.now__hint {
-  margin-top: 12px;
-  font-size: 0.8rem;
-  color: var(--ink-3);
-}
-
-/* ---------- 歌词卡片 ---------- */
 .lyrics {
   display: flex;
   flex-direction: column;
+  /* 作为网格项允许被行轨道压到可用高度 */
   min-height: 0;
-  padding: 16px 8px 16px 16px;
+  overflow: hidden;
+  padding: 16px 18px 20px;
 }
 
 .card__head {
@@ -400,7 +339,7 @@ ol {
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 8px 10px 4px;
+  padding: 0 2px 10px;
 }
 
 .card__heading {
@@ -420,18 +359,16 @@ ol {
 /* 歌词滚动区：只在卡片内部滚动，绝不会把页面撑出屏幕 */
 .lyrics__scroll {
   flex: 1 1 auto;
-  min-height: 220px;
-  max-height: clamp(240px, 46vh, 460px);
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
   border-radius: var(--r-inner);
-  padding: 10px 10px 10px 6px;
+  padding: 10px 8px;
   scrollbar-width: thin;
   scrollbar-color: var(--track) transparent;
-  /* 上下淡出，暗示还有内容 */
-  mask-image: linear-gradient(180deg, transparent 0, #000 10%, #000 90%, transparent 100%);
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 10%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 91%, transparent 100%);
 }
 
 .lyrics__scroll::-webkit-scrollbar {
@@ -456,13 +393,18 @@ ol {
 }
 
 .lyric-line {
-  padding: 9px 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 9px 16px;
   border-radius: 14px;
-  font-size: 0.98rem;
+  font-size: 1rem;
   line-height: 1.45;
+  text-align: center;
   color: var(--ink-2);
   overflow-wrap: anywhere;
-  transition: color 0.25s var(--ease), background 0.25s var(--ease);
+  transition: color 0.25s var(--ease), background 0.25s var(--ease),
+    box-shadow 0.25s var(--ease);
 }
 
 /* 高亮只改颜色/字重/底色，不做缩放 —— 放大是之前歌词超出屏幕的根因 */
@@ -470,7 +412,7 @@ ol {
   color: var(--ink);
   font-weight: 700;
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent-fill);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-fill) 32%, transparent);
 }
 
 .lyric-line.past {
@@ -478,136 +420,93 @@ ol {
   opacity: 0.72;
 }
 
-/* ---------- 歌单卡片 ---------- */
-.list {
-  grid-column: 1 / -1;
-  padding: 16px;
-}
-
-.list__items {
-  max-height: 340px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--track) transparent;
-}
-
-.list__items::-webkit-scrollbar {
-  width: 8px;
-}
-
-.list__items::-webkit-scrollbar-thumb {
-  background: var(--track);
-  border-radius: var(--r-pill);
-}
-
-.list__row {
-  display: grid;
-  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 14px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.18s var(--ease), color 0.18s var(--ease);
-}
-
-.list__row:hover {
-  background: var(--btn-bg);
-}
-
-.list__no {
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-3);
-}
-
-.list__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.list__title {
-  font-size: 0.94rem;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.list__artist {
-  font-size: 0.78rem;
-  color: var(--ink-3);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.list__state {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--accent-ink);
-  opacity: 0;
-}
-
-.list__row[aria-current="true"] {
-  background: var(--accent-soft);
-}
-
-.list__row[aria-current="true"] .list__title {
-  font-weight: 700;
-  color: var(--accent-ink);
-}
-
-.list__row[aria-current="true"] .list__state {
-  opacity: 1;
-}
-
-/* ---------- 底部磨砂播放条 ---------- */
+/* =============================================================
+   播放器卡片：封面 + 曲名 + 进度 + 控制 + 可展开歌单，全在一张卡里
+   ============================================================= */
 .player {
   position: fixed;
   left: 24px;
   right: 24px;
   bottom: 16px;
   z-index: 20;
-  /* 与 .shell 的内容宽度对齐（1180 - 24*2），两边不会错位 */
+  /* 与 .shell 内容宽度对齐（1180 - 24*2） */
   max-width: 1132px;
   margin: 0 auto;
-  padding: 10px 18px calc(12px + env(safe-area-inset-bottom));
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
   border-radius: var(--r-card);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "cover meta queue"
+    "prog  prog prog"
+    "ctrl  ctrl ctrl";
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 6px;
+}
+
+.player__cover {
+  grid-area: cover;
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  object-fit: cover;
+  display: block;
+  box-shadow: 0 6px 16px rgba(8, 10, 14, 0.28);
+  background: rgba(120, 120, 128, 0.24);
+}
+
+.player__meta {
+  grid-area: meta;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.player__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player__artist {
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn--queue {
+  grid-area: queue;
 }
 
 .player__progress {
+  grid-area: prog;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .player__time {
-  min-width: 42px;
-  font-size: 0.76rem;
+  min-width: 38px;
+  font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
   text-align: center;
 }
 
 .player__row {
+  grid-area: ctrl;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-top: 2px;
+  gap: 10px;
 }
 
 .player__group {
@@ -626,12 +525,12 @@ ol {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 0;
+  border: 1px solid transparent;
   background: var(--btn-bg);
   color: var(--ink);
   cursor: pointer;
-  transition: background 0.18s var(--ease), transform 0.14s var(--ease),
-    color 0.18s var(--ease);
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 
 .btn svg {
@@ -642,53 +541,39 @@ ol {
 }
 
 .btn--round {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
 }
 
 .btn--pill {
-  height: 46px;
-  padding: 0 16px;
+  height: 40px;
+  padding: 0 14px;
   border-radius: var(--r-pill);
 }
 
-.btn:hover {
-  background: var(--btn-bg-hover);
-}
-
-.btn:active {
-  transform: scale(0.94);
-}
-
 .btn--play {
-  width: 58px;
-  height: 58px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   background: var(--accent-fill);
   color: var(--on-accent);
   box-shadow: 0 10px 26px var(--accent-glow);
 }
 
-.btn--play:hover {
-  background: var(--accent-fill);
-  filter: brightness(1.06);
-}
-
 .btn--play svg {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
 }
 
 .btn__heart {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: var(--accent-ink);
 }
 
 .btn__count {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -701,6 +586,43 @@ ol {
   0% { transform: scale(1); }
   45% { transform: scale(1.32); }
   100% { transform: scale(1); }
+}
+
+/* ---------- 悬浮态：放大 1.05 + 90% 不透明 + 主题色磨砂玻璃 ---------- */
+.btn,
+.chip,
+.topbar__back,
+.queue__close {
+  backdrop-filter: blur(12px) saturate(170%);
+  -webkit-backdrop-filter: blur(12px) saturate(170%);
+  transition: transform 0.16s var(--ease), opacity 0.16s var(--ease),
+    background 0.2s var(--ease), box-shadow 0.2s var(--ease),
+    color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.btn:hover,
+.chip:hover,
+.topbar__back:hover,
+.queue__close:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+  background: color-mix(in srgb, var(--accent-fill) 34%, var(--glass-hover));
+  border-color: color-mix(in srgb, var(--accent-fill) 42%, transparent);
+  box-shadow: 0 10px 26px var(--accent-glow), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* 实心播放键：保持主题色，只变得半透明一点 */
+.btn--play:hover {
+  background: color-mix(in srgb, var(--accent-fill) 82%, transparent);
+  box-shadow: 0 12px 30px var(--accent-glow);
+}
+
+.btn:active,
+.chip:active,
+.topbar__back:active,
+.queue__close:active {
+  transform: scale(0.97);
+  opacity: 1;
 }
 
 /* ---------- 音量菜单 ---------- */
@@ -746,13 +668,13 @@ ol {
   text-align: center;
 }
 
-/* ---------- 滑杆（进度 / 音量） ---------- */
+/* ---------- 滑杆 ---------- */
 .seek {
   -webkit-appearance: none;
   appearance: none;
   flex: 1 1 auto;
   width: 100%;
-  height: 20px;
+  height: 18px;
   margin: 0;
   background: transparent;
   cursor: pointer;
@@ -770,9 +692,9 @@ ol {
 
 .seek::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -4px;
+  width: 13px;
+  height: 13px;
+  margin-top: -3.5px;
   border: 0;
   border-radius: 50%;
   background: #fff;
@@ -792,8 +714,8 @@ ol {
 }
 
 .seek::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border: 0;
   border-radius: 50%;
   background: #fff;
@@ -806,43 +728,215 @@ ol {
 }
 
 /* =============================================================
-   响应式：桌面三卡布局 → 平板单列 → 手机紧凑
+   歌单面板：点「歌单」从播放器卡片上方展开
+   ============================================================= */
+.queue {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
+  pointer-events: none;
+}
+
+.queue__panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(54vh, 460px);
+  padding: 12px 4px 8px 4px;
+  border-radius: 24px;
+  border: 1px solid var(--glass-line);
+  background:
+    linear-gradient(150deg, color-mix(in srgb, var(--accent-fill) 16%, transparent), transparent 60%),
+    var(--panel-bg);
+  box-shadow: var(--shadow-float), inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(var(--blur)) saturate(170%);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(170%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(14px) scale(0.98);
+  transform-origin: bottom center;
+  transition: opacity 0.24s var(--ease), transform 0.24s var(--ease),
+    visibility 0s 0.24s;
+}
+
+.player.is-queue-open .queue {
+  pointer-events: auto;
+}
+
+.player.is-queue-open .queue__panel {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.24s var(--ease), transform 0.24s var(--ease);
+}
+
+.queue__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 8px 12px;
+}
+
+.queue__title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.queue__hint {
+  flex: 1 1 auto;
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.queue__close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: var(--btn-bg);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.queue__close svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.queue__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--track) transparent;
+  /* 左右各留 4px 给滚动条；整行放大的溢出靠"基础宽度已缩到 1/1.05"抵消 */
+  padding-inline: 4px;
+}
+
+.queue__scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.queue__scroll::-webkit-scrollbar-thumb {
+  background: var(--track);
+  border-radius: var(--r-pill);
+}
+
+/* ---------- 歌单行 ---------- */
+.list__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.list__row {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  /* 先缩到 1/1.05，悬浮放大 1.05 后正好铺满容器 —— 全宽元素直接 scale
+     会向两侧各溢出 2.5%，冒出横向滚动条 */
+  width: calc(100% / 1.05);
+  margin-inline: auto;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s var(--ease), opacity 0.16s var(--ease),
+    transform 0.16s var(--ease), box-shadow 0.2s var(--ease),
+    border-color 0.18s var(--ease);
+}
+
+/* 整行也按统一规格放大 1.05 + 90% 不透明 + 主题色磨砂玻璃，
+   横向溢出靠 .queue__scroll 的 12px 内边距吃掉 */
+.list__row:hover {
+  transform: scale(1.05);
+  opacity: 0.9;
+  background: color-mix(in srgb, var(--accent-fill) 22%, var(--row-hover));
+  border-color: color-mix(in srgb, var(--accent-fill) 32%, transparent);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.list__row:active {
+  opacity: 1;
+}
+
+.list__no {
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.list__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.list__title {
+  font-size: 0.92rem;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list__artist {
+  font-size: 0.76rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list__state {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+  opacity: 0;
+}
+
+.list__row[aria-current="true"] {
+  background: var(--accent-soft);
+}
+
+.list__row[aria-current="true"] .list__title {
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.list__row[aria-current="true"] .list__state {
+  opacity: 1;
+}
+
+/* =============================================================
+   响应式
    ============================================================= */
 
-/* 平板：单列堆叠，正在播放卡片改为横排 */
+/* 平板：歌单面板矮一点 */
 @media (max-width: 1024px) {
-  .stage {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .now {
-    flex-direction: row;
-    align-items: center;
-    gap: 18px;
-  }
-
-  .now__cover {
-    width: min(38%, 220px);
-    flex: 0 0 auto;
-  }
-
-  .now__meta {
-    flex: 1 1 auto;
-  }
-
-  .lyrics__scroll {
-    max-height: clamp(220px, 40vh, 380px);
-  }
-
-  .list__items {
-    max-height: 300px;
+  .queue__panel {
+    max-height: 50vh;
   }
 }
 
 /* 手机 */
 @media (max-width: 720px) {
   body {
-    padding-bottom: 130px;
+    padding-bottom: 170px;
   }
 
   .shell {
@@ -852,6 +946,7 @@ ol {
   .stage {
     gap: 12px;
     margin-top: 12px;
+    min-height: 260px;
   }
 
   .card {
@@ -879,47 +974,17 @@ ol {
     font-size: 0.9rem;
   }
 
-  .now {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 14px;
-    padding: 14px;
-  }
-
-  .now__cover {
-    width: min(66%, 260px);
-    margin: 0 auto;
-  }
-
-  .now__title {
-    font-size: 1.22rem;
-  }
-
   .lyrics {
-    padding: 14px 6px 14px 14px;
+    padding: 14px 12px 16px;
   }
 
   .lyrics__scroll {
-    min-height: 180px;
-    max-height: 38vh;
     scroll-behavior: auto;
   }
 
   .lyric-line {
-    font-size: 0.95rem;
-  }
-
-  .list {
-    padding: 14px 10px;
-  }
-
-  .list__items {
-    max-height: 46vh;
-  }
-
-  .list__row {
-    padding: 9px 10px;
-    gap: 8px;
+    font-size: 0.96rem;
+    padding: 8px 14px;
   }
 
   .player {
@@ -928,34 +993,50 @@ ol {
     bottom: 8px;
     padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
     border-radius: 22px;
+    column-gap: 10px;
+    row-gap: 5px;
   }
 
-  .player__row {
-    gap: 8px;
+  .player__cover {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
   }
 
-  .player__group {
-    gap: 8px;
-  }
-
-  .btn--round {
-    width: 42px;
-    height: 42px;
-  }
-
-  .btn--play {
-    width: 52px;
-    height: 52px;
-  }
-
-  .btn--pill {
-    height: 42px;
-    padding: 0 12px;
+  .player__title {
+    font-size: 0.9rem;
   }
 
   .player__time {
-    min-width: 36px;
+    min-width: 34px;
     font-size: 0.7rem;
+  }
+
+  .btn--round {
+    width: 40px;
+    height: 40px;
+  }
+
+  .btn--play {
+    width: 50px;
+    height: 50px;
+  }
+
+  .btn--pill {
+    height: 38px;
+    padding: 0 12px;
+    font-size: 0.82rem;
+  }
+
+  .queue__panel {
+    max-height: 56vh;
+    padding: 10px 2px 6px 2px;
+    border-radius: 20px;
+  }
+
+  .list__row {
+    padding: 8px 10px;
+    gap: 8px;
   }
 
   .seek--sm {
@@ -963,28 +1044,29 @@ ol {
   }
 }
 
-/* 超窄屏：播放条按钮再缩一档 */
+/* 超窄屏再缩一档 */
 @media (max-width: 380px) {
   .btn--round {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
   }
 
   .btn--play {
-    width: 48px;
-    height: 48px;
-  }
-
-  .player__group--end {
-    gap: 4px;
+    width: 46px;
+    height: 46px;
   }
 
   .btn--pill {
     padding: 0 10px;
   }
+
+  .player__group {
+    gap: 6px;
+  }
 }
 
-/* 尊重系统的减少动效设置 */
+/* 尊重系统的减少动效设置：过渡瞬间完成，但悬浮态的"放大 1.05"保留
+   （那是静态状态切换，不是持续动画，去掉反而会丢掉可点击的反馈） */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

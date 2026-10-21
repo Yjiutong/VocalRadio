@@ -38,21 +38,10 @@
     </header>
 
     <main class="stage">
-      <section class="card now" aria-labelledby="nowTitle">
-        <div class="now__cover">
-          <img id="coverImg" class="now__cover-img" src="./cover/default.png" alt="当前歌曲封面" crossorigin="anonymous">
-        </div>
-        <div class="now__meta">
-          <p class="now__index" id="nowIndex">正在载入…</p>
-          <h2 class="now__title" id="songTitle">—</h2>
-          <p class="now__artist" id="songArtist">—</p>
-          <p class="now__hint">随机电台 · 每次打开都是新的顺序</p>
-        </div>
-      </section>
-
       <section class="card lyrics" aria-labelledby="lyricHeading">
         <div class="card__head">
           <h2 class="card__heading" id="lyricHeading">歌词</h2>
+          <p class="card__count" id="nowIndex">正在载入…</p>
         </div>
         <div class="lyrics__scroll" id="lyricBox" tabindex="0" role="region" aria-label="歌词，可上下滚动">
           <div id="lyricWrap" class="lyrics__inner">
@@ -60,18 +49,38 @@
           </div>
         </div>
       </section>
-
-      <section class="card list" aria-labelledby="listHeading">
-        <div class="card__head">
-          <h2 class="card__heading" id="listHeading">歌单</h2>
-          <p class="card__count" id="listCount">载入中</p>
-        </div>
-        <ol class="list__items" id="playlistList"></ol>
-      </section>
     </main>
   </div>
 
-  <footer class="player card card--glass" aria-label="播放控制">
+  <footer class="player card card--glass" id="player" aria-label="播放器">
+    <img id="coverImg" class="player__cover" src="./cover/default.png" alt="当前歌曲封面" crossorigin="anonymous">
+    <div class="player__meta">
+      <h2 class="player__title" id="songTitle">—</h2>
+      <p class="player__artist" id="songArtist">—</p>
+    </div>
+    <button class="btn btn--pill btn--queue" id="queueToggle" type="button"
+            aria-expanded="false" aria-controls="queuePanel">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm0 5a1 1 0 0 1 1-1h9a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm0 5a1 1 0 0 1 1-1h5a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1zm14.7-6.3a1 1 0 0 1 1.4 1.4l-2.1 2.1a1 1 0 0 1-1.4 0l-1.1-1.1a1 1 0 0 1 1.4-1.4l.4.4 1.4-1.4z"/></svg>
+      <span>歌单</span>
+    </button>
+
+    <!-- 歌单：点「歌单」按钮从播放器卡片上方展开。
+         放在触发按钮之后，Tab 顺序才是 按钮 → 面板项目 → 进度条 → 控制键 -->
+    <div class="queue">
+      <div class="queue__panel" id="queuePanel">
+        <div class="queue__head">
+          <h2 class="queue__title" id="queueHeading">歌单</h2>
+          <span class="queue__hint" id="listCount">0 首</span>
+          <button class="queue__close" id="queueClose" type="button" aria-label="收起歌单">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6.4 5A1 1 0 0 0 5 6.4L10.6 12 5 17.6A1 1 0 1 0 6.4 19l5.6-5.6 5.6 5.6a1 1 0 1 0 1.4-1.4L13.4 12 19 6.4A1 1 0 1 0 17.6 5L12 10.6 6.4 5z"/></svg>
+          </button>
+        </div>
+        <div class="queue__scroll" id="queueScroll">
+          <ol class="list__items" id="playlistList" aria-labelledby="queueHeading"></ol>
+        </div>
+      </div>
+    </div>
+
     <div class="player__progress">
       <label class="sr-only" for="seek">播放进度</label>
       <span class="player__time" id="timeNow">0:00</span>

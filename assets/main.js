@@ -34,6 +34,11 @@ const volumePopover = document.querySelector("#volumePopover");
 const seekEl = document.querySelector("#seek");
 const timeNowEl = document.querySelector("#timeNow");
 const timeTotalEl = document.querySelector("#timeTotal");
+const playerEl = document.querySelector("#player");
+const queueToggle = document.querySelector("#queueToggle");
+const queueClose = document.querySelector("#queueClose");
+const queuePanel = document.querySelector("#queuePanel");
+const queueScroll = document.querySelector("#queueScroll");
 
 // ---------- 状态 ----------
 let lyricLines = [];
@@ -241,6 +246,44 @@ async function updateNowIndex() {
     : `共 ${list.length} 首`;
 }
 
+// ---------- 歌单展开 / 收起 ----------
+function isQueueOpen() {
+  return playerEl?.classList.contains("is-queue-open") ?? false;
+}
+
+/** 打开歌单时把"正在播放"那行滚到可视区中间，同样只动容器 scrollTop */
+function revealActiveRow() {
+  const row = playlistList?.querySelector('.list__row[aria-current="true"]');
+  if (!row || !queueScroll) return;
+  const rowRect = row.getBoundingClientRect();
+  const boxRect = queueScroll.getBoundingClientRect();
+  if (rowRect.top >= boxRect.top && rowRect.bottom <= boxRect.bottom) return;
+  const delta = rowRect.top - boxRect.top + queueScroll.scrollTop;
+  const target = delta - (queueScroll.clientHeight - rowRect.height) / 2;
+  const max = queueScroll.scrollHeight - queueScroll.clientHeight;
+  queueScroll.scrollTop = Math.max(0, Math.min(target, Math.max(max, 0)));
+}
+
+function setQueueOpen(open) {
+  if (!playerEl || !queueToggle) return;
+  if (isQueueOpen() === open) return;
+  playerEl.classList.toggle("is-queue-open", open);
+  queueToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    markActiveRow();
+    // 等展开过渡跑完再量位置，否则读到的是动画中间态
+    requestAnimationFrame(() => requestAnimationFrame(revealActiveRow));
+  }
+}
+
+function closeQueue() {
+  setQueueOpen(false);
+}
+
+function toggleQueue() {
+  setQueueOpen(!isQueueOpen());
+}
+
 // =============================================================
 // 载入一首歌
 // =============================================================
@@ -256,20 +299,7 @@ async function loadSong(rawFileName) {
 
   coverImg.crossOrigin = "anonymous";
   let coverFallbackUsed = false;
-
-  // ① 先上低清图，同时用它做背景（同一张图，最省流量）
-  coverImg.src = info.thumbCoverSrc;
-  setAmbient(info.thumbCoverSrc);
-
-  // ② 后台静默预加载高清原图
-  const hdImage = new Image();
-  hdImage.crossOrigin = "anonymous";
-  hdImage.onload = () => {
-    coverImg.src = info.coverSrc;
-    // 取色只用高清原图，缩略图会偏色
-    handleCoverColor();
-  };
-  hdImage.onerror = () => {
+  coverImg.onerror = () => {
     if (coverFallbackUsed) return;
     coverFallbackUsed = true;
     coverImg.src = "./cover/default.png";
@@ -277,7 +307,17 @@ async function loadSong(rawFileName) {
     dynLight = [220, 248, 246];
     applyTheme(dynDark, dynLight);
   };
-  hdImage.src = info.coverSrc;
+  coverImg.onload = () => handleCoverColor();
+
+  // 卡片里的封面只有 48px，背景还要再模糊一遍 —— 用 240px 的缩略图就够，
+  // 不再预加载 2MB 的高清原图（省下的流量相当可观，调色板结果几乎一样）。
+  if (coverImg.getAttribute("src") === info.thumbCoverSrc && coverImg.complete) {
+    // 同一首歌重复载入时 src 不变，不会触发 onload
+    handleCoverColor();
+  } else {
+    coverImg.src = info.thumbCoverSrc;
+  }
+  setAmbient(info.thumbCoverSrc);
 
   audioPlayer.src = info.audioSrc;
   resetProgress();
@@ -597,6 +637,13 @@ function bindEvents() {
   audioPlayer.addEventListener("ended", handleNext);
   audioPlayer.addEventListener("timeupdate", updateLyricHighlight);
 
+  // 歌单：点「歌单」按钮从下方卡片上方展开，再点收起
+  queueToggle.addEventListener("click", toggleQueue);
+  queueClose.addEventListener("click", () => {
+    closeQueue();
+    queueToggle.focus(); // 关掉面板后焦点回到触发它的按钮
+  });
+
   // 进度条
   audioPlayer.addEventListener("loadedmetadata", () => {
     timeTotalEl.textContent = fmtTime(audioPlayer.duration);
@@ -606,9 +653,11 @@ function bindEvents() {
     }
   });
   audioPlayer.addEventListener("timeupdate", () => {
+    // 拖动进度条时不要用真实播放位置覆盖预览值（timeupdate 每秒会来好几次）
+    if (seeking) return;
     const dur = audioPlayer.duration;
     timeNowEl.textContent = fmtTime(audioPlayer.currentTime);
-    if (!seeking && Number.isFinite(dur) && dur > 0) {
+    if (Number.isFinite(dur) && dur > 0) {
       const ratio = audioPlayer.currentTime / dur;
       seekEl.value = String(Math.round(ratio * 1000));
       setRangeFill(seekEl, ratio);
@@ -629,7 +678,7 @@ function bindEvents() {
     seeking = false;
   });
 
-  // 歌单：事件委托，点哪首播哪首
+  // 歌单：事件委托，点哪首播哪首；换歌后把面板收起来，让出歌词区
   playlistList.addEventListener("click", (e) => {
     const row = e.target.closest(".list__row");
     if (!row) return;
@@ -646,6 +695,7 @@ function bindEvents() {
       }
       return;
     }
+    closeQueue();
     playTrackByFile(file);
   });
 
@@ -677,10 +727,19 @@ function bindEvents() {
     if (!volumeControl.contains(e.relatedTarget)) scheduleHideVolumeMenu();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeVolumeMenu();
+    if (e.key !== "Escape") return;
+    closeVolumeMenu();
+    if (!isQueueOpen()) return;
+    // 焦点如果还在面板里（含关闭按钮），收起后必须还回触发按钮，
+    // 否则焦点会停在一个已经 visibility:hidden 的元素上
+    const wasInside = queuePanel?.contains(document.activeElement);
+    closeQueue();
+    if (wasInside) queueToggle.focus();
   });
   document.addEventListener("click", (e) => {
     if (!volumeControl.contains(e.target)) closeVolumeMenu();
+    // 点播放器以外的任何地方都收起歌单（点卡片内部不算）
+    if (isQueueOpen() && !playerEl.contains(e.target)) closeQueue();
   });
 }
 
