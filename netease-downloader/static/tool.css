@@ -1,0 +1,84 @@
+/* 下载器自带的基础样式：不再依赖站点 asset/style.css（工具是独立本地应用） */
+:root{
+  --primary:#0b7c74;
+  --bg:#f7f4ee;
+  --surface:#fffdf9;
+  --text:#1a1815;
+  --text-secondary:#6b6459;
+  --border:#ded6c8;
+  --radius:2px;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Consolas,"Liberation Mono",monospace;
+}
+[data-theme="dark"]{
+  --primary:#39c5bb;
+  --bg:#131211;
+  --surface:#1b1917;
+  --text:#ece6dc;
+  --text-secondary:#a09889;
+  --border:#3b352d;
+}
+
+*,*::before,*::after{ box-sizing:border-box; margin:0; padding:0; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14px;
+  line-height:1.65;
+  min-height:100vh;
+  transition:background .3s ease, color .3s ease;
+}
+a{ color:var(--primary); }
+code{
+  font-family:var(--mono);
+  font-size:.9em;
+  background:var(--bg);
+  border:1px solid var(--border);
+  padding:1px 5px;
+}
+
+/* 顶栏 */
+.top-bar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 16px;
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.top-bar .brand{
+  font-weight:700;
+  font-size:16px;
+  color:var(--text);
+  letter-spacing:.01em;
+}
+.top-bar .muted-inline{
+  font-family:var(--mono);
+  font-size:11.5px;
+  color:var(--text-secondary);
+  letter-spacing:.04em;
+}
+#theme{
+  border:1px solid var(--border);
+  background:transparent;
+  color:var(--text-secondary);
+  font-family:var(--mono);
+  font-size:11.5px;
+  padding:6px 10px;
+  border-radius:0;
+  cursor:pointer;
+  white-space:nowrap;
+}
+#theme:hover{ color:var(--text); border-color:var(--text); }
+
+/* 卡片容器（form.html 里 .panel 复用这个外观） */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;
+}

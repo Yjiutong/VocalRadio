@@ -1,16 +1,15 @@
 /**
- * 术力口电台后端（Cloudflare Worker + D1）
+ * 术力口电台后端（Cloudflare Worker + D1）—— 只负责「点赞 / 播放」计数
  *
- * 相对原先「全部塞进 KV」的改动：
- *   1. 点赞用 `likes = likes + 1` 原子自增 —— KV 的读-改-写没有原子性，并发必丢；
- *      而且 KV 对同一 key 限制 1 次写/秒，热门歌曲连点几次就写不进去。
- *   2. 歌单与计数放同一张表 —— 原先 KV 里的 `songlist`、仓库的 playlist.txt、
- *      前端硬编码三份数据，谁也不知道哪个是对的。现在 D1 是唯一事实来源。
- *   3. /api/allLikes 一次 SELECT 取全部 —— 原先是 23 首歌 23 次串行 kv.get。
- *   4. key 必须存在于歌单，否则不写库 —— 原先任意 key 都能创建 KV 记录，无界增长。
- *   5. 免费额度：KV 写 1,000/天 → D1 写 100,000 行/天，播放上报不再轻易打满。
+ * 歌单在哪：仓库根目录的 playlist.txt。前端直接读本地文件，下载器负责维护，
+ *   push 到 Pages 即生效。所以这里既不需要歌单接口，也不需要往 D1 手写歌单。
  *
- * 接口路径与返回结构与旧版完全一致，前端无需改动。
+ * 为什么用 D1 而不是 KV：
+ *   KV 的 get→+1→put 没有原子性（50 次并发实测只剩 1），且同一 key 限制 1 次写/秒、
+ *   免费额度只有 1,000 写/天。D1 用 `INSERT ... ON CONFLICT DO UPDATE SET likes = likes + 1`
+ *   一条语句原子完成，免费额度 10 万行写/天。
+ *
+ * 计数行按需创建：没人点过的歌不会在表里占一行，新增歌曲无需任何数据库操作。
  */
 
 const CORS_HEADERS = {
@@ -20,11 +19,19 @@ const CORS_HEADERS = {
   "Cache-Control": "no-store",
 };
 
+// 只接受符合命名规律的 key（序号_歌手_歌名.mp3），
+// 避免任意字符串在表里刷出无限行。
+const KEY_RE = /^\d{1,4}_.+\.mp3$/;
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json;charset=utf-8", ...CORS_HEADERS },
   });
+}
+
+function invalidKey(key) {
+  return !key || key.length > 200 || !KEY_RE.test(key);
 }
 
 export default {
@@ -45,16 +52,18 @@ export default {
     }
 
     try {
-      /* ---------- 1. 歌单 ---------- */
-      if (path === "/api/random") {
-        const { results } = await db
-          .prepare("SELECT filename FROM songs ORDER BY added_at, filename")
-          .all();
-        const list = (results || []).map((r) => r.filename);
-        return json({ list });
+      /* ---------- 歌单已迁到仓库，接口下线 ---------- */
+      if (path === "/api/random" || path === "/api/songlist") {
+        return json(
+          {
+            error: "gone",
+            message: "歌单已迁移到仓库根目录的 playlist.txt，由前端直接读取；查看计数请用 GET /api/songs。",
+          },
+          410
+        );
       }
 
-      /* ---------- 2. 全部点赞（一次查询） ---------- */
+      /* ---------- 全部点赞（只返回有互动的歌，缺省视为 0） ---------- */
       if (path === "/api/allLikes") {
         const { results } = await db.prepare("SELECT filename, likes FROM songs").all();
         const out = {};
@@ -62,40 +71,46 @@ export default {
         return json(out);
       }
 
-      /* ---------- 3. 单曲点赞数 ---------- */
+      /* ---------- 单曲点赞数 ---------- */
       if (path === "/api/getLike") {
         const key = url.searchParams.get("key");
-        if (!key) return json({ error: "no key" }, 400);
+        if (invalidKey(key)) return json({ count: 0 });
         const row = await db
           .prepare("SELECT likes FROM songs WHERE filename = ?1")
           .bind(key)
           .first();
-        // 未知 key 返回 0 而不是报错：前端会直接把这个数字写进 DOM
+        // 没被点过的歌返回 0，前端会把这个数字直接写进 DOM
         return json({ count: row ? row.likes : 0 });
       }
 
-      /* ---------- 4. 点赞 +1（原子） ---------- */
+      /* ---------- 点赞 +1（按需建行 + 原子自增） ---------- */
       if (path === "/api/like") {
         const key = url.searchParams.get("key");
         if (!key) return json({ error: "no key" }, 400);
+        if (invalidKey(key)) return json({ key, count: 0, ignored: "invalid key" });
 
         const row = await db
-          .prepare("UPDATE songs SET likes = likes + 1 WHERE filename = ?1 RETURNING likes")
+          .prepare(
+            "INSERT INTO songs (filename, likes) VALUES (?1, 1) " +
+              "ON CONFLICT(filename) DO UPDATE SET likes = likes + 1, updated_at = datetime('now') " +
+              "RETURNING likes"
+          )
           .bind(key)
           .first();
 
-        // 不在歌单里的 key 不写库，但仍然返回数字，避免前端显示 undefined
-        if (!row) return json({ key, count: 0, ignored: "unknown key" });
-        return json({ key, count: row.likes });
+        return json({ key, count: row ? row.likes : 0 });
       }
 
-      /* ---------- 5. 播放上报（异步，不阻塞响应） ---------- */
+      /* ---------- 播放上报（异步，不阻塞响应） ---------- */
       if (path === "/api/play") {
         const key = url.searchParams.get("key");
-        if (key) {
+        if (key && !invalidKey(key)) {
           ctx.waitUntil(
             db
-              .prepare("UPDATE songs SET plays = plays + 1 WHERE filename = ?1")
+              .prepare(
+                "INSERT INTO songs (filename, plays) VALUES (?1, 1) " +
+                  "ON CONFLICT(filename) DO UPDATE SET plays = plays + 1, updated_at = datetime('now')"
+              )
               .bind(key)
               .run()
               .catch((e) => console.warn("play 计数失败", e))
@@ -104,12 +119,12 @@ export default {
         return json({ ok: true });
       }
 
-      /* ---------- 6. 歌单详情（含点赞/播放，调试与后台用） ---------- */
-      if (path === "/api/songs" || path === "/api/songlist") {
+      /* ---------- 排行 / 后台查看 ---------- */
+      if (path === "/api/songs") {
         const { results } = await db
           .prepare(
-            "SELECT filename, song_id, singer, title, likes, plays, added_at " +
-              "FROM songs ORDER BY added_at, filename"
+            "SELECT filename, likes, plays, updated_at FROM songs " +
+              "ORDER BY likes DESC, plays DESC, filename LIMIT 500"
           )
           .all();
         return json({ list: results || [] });
@@ -117,14 +132,14 @@ export default {
 
       /* ---------- 根路径 ---------- */
       return json({
-        msg: "术力口电台 worker（D1）",
+        msg: "术力口电台 worker（D1，只做计数）",
+        playlist: "仓库根目录 playlist.txt",
         endpoints: [
-          "GET /api/random      → { list: [filename...] }",
-          "GET /api/allLikes    → { filename: likes }",
-          "GET /api/getLike?key=→ { count }",
           "GET /api/like?key=   → { key, count }",
+          "GET /api/getLike?key=→ { count }",
+          "GET /api/allLikes    → { filename: likes }",
           "GET /api/play?key=   → { ok }",
-          "GET /api/songs       → { list: [{filename,singer,title,likes,plays}] }",
+          "GET /api/songs       → { list: [{filename,likes,plays}] }",
         ],
       });
     } catch (e) {

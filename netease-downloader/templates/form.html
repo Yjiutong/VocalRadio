@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网易云电台下载器</title>
+<link rel="stylesheet" href="/static/tool.css">
+<style>
+  .container{max-width:960px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:16px;}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+  .search-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .search-row input[type=text]{flex:1 1 260px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);}
+  .btn{cursor:pointer;border:none;border-radius:8px;padding:9px 16px;background:var(--primary);color:#fff;font-weight:600;}
+  .btn.ghost{background:transparent;color:var(--primary);border:1px solid var(--primary);}
+  .btn.danger{background:#e0544f;color:#fff;}
+  .btn.small{padding:4px 10px;font-size:12px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .results{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;}
+  .result-card{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--bg);}
+  .result-card img{width:54px;height:54px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#333;}
+  .r-info{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0;}
+  .r-info input{border:1px solid transparent;background:transparent;color:var(--text);padding:2px 4px;border-radius:4px;width:100%;}
+  .r-info input:focus{border-color:var(--primary);background:var(--bg);outline:none;}
+  .r-artist{font-size:12px;color:var(--text-secondary);}
+  .r-check{width:16px;height:16px;flex-shrink:0;}
+  .log{max-height:200px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:12px;white-space:pre-wrap;color:var(--text);}
+  .log .ok{color:var(--primary);}
+  .log .err{color:#e0544f;}
+  .pl-row{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);font-size:14px;}
+  .pl-row:last-child{border-bottom:none;}
+  .pl-idx{width:38px;color:var(--text-secondary);}
+  .pl-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .pl-badges{display:flex;gap:4px;}
+  .badge{font-size:11px;padding:1px 6px;border-radius:6px;background:rgba(57,197,187,.15);color:var(--primary);}
+  .pl-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .pl-actions button{flex:1 1 200px;}
+  h2{margin:0 0 10px;font-size:17px;color:var(--text);}
+  .muted{color:var(--text-secondary);font-size:12px;}
+  .progressbar{height:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .progressbar>div{height:100%;background:var(--primary);width:0;transition:width .2s;}
+  .hint{font-size:12px;color:var(--text-secondary);margin:6px 0 0;}
+  .tag{cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="top-bar">
+  <span class="brand">网易云电台下载器</span>
+  <span class="muted-inline">本地工具 · 输出到 VocalRadio 仓库</span>
+  <span class="spacer" style="flex:1"></span>
+  <button id="theme">切换主题</button>
+</div>
+
+<div class="container">
+  <!-- 搜索 -->
+  <div class="card panel">
+    <div class="search-row">
+      <input id="q" type="text" placeholder="输入歌名 / 歌手 / 网易云歌曲链接…">
+      <button class="btn" id="searchBtn">搜索</button>
+    </div>
+    <input id="cookie" type="text" style="width:100%;margin-top:8px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);"
+           placeholder="网易云 Cookie（可选，用于高音质/解锁会员曲；留空则匿名下载）">
+    <p class="hint">搜索后可在结果中直接编辑「歌手 / 歌名」，再勾选下载；多歌手建议用 <code>&amp;</code> 分隔。</p>
+  </div>
+
+  <!-- 结果 -->
+  <div id="results" class="results"></div>
+
+  <!-- 批量下载 -->
+  <div class="card panel" id="batchPanel" style="display:none;">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn" id="downloadSel">批量下载勾选</button>
+      <button class="btn ghost" id="clearSel">清空勾选</button>
+      <span id="batchInfo" class="muted"></span>
+    </div>
+    <div class="progressbar" style="margin-top:10px;"><div id="progFill"></div></div>
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <!-- 歌单管理 -->
+  <div class="card panel">
+    <h2>歌单管理 <span class="muted" id="plCount"></span></h2>
+    <div id="playlist"></div>
+    <div class="pl-actions">
+      <button class="btn" id="saveOrder">保存排序（重新编号）</button>
+      <button class="btn ghost" id="exportTxt">导出歌单 txt</button>
+      <button class="btn ghost" id="syncJs">同步歌单文件</button>
+    </div>
+    <p class="hint">「同步歌单文件」= 把当前曲目顺序写回仓库根的 <code>playlist.txt</code>，
+      网页播放器直接读它，写完推送到仓库即上线，无需再去 Cloudflare 后台维护歌单。</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var state = { songs: [], plist: [] };
+var cookie = function(){ return $("cookie").value.trim(); };
+
+function log(msg, cls){
+  var line = document.createElement("div");
+  line.textContent = msg;
+  if(cls) line.className = cls;
+  $("log").appendChild(line);
+  $("log").scrollTop = $("log").scrollHeight;
+}
+
+/* ---------- 主题（复用 asset/style.css） ---------- */
+(function(){
+  var root = document.documentElement;
+  root.setAttribute("data-theme", localStorage.getItem("netease_tool_theme") || "light");
+  $("theme").addEventListener("click", function(){
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    localStorage.setItem("netease_tool_theme", next);
+    root.setAttribute("data-theme", next);
+  });
+})();
+
+/* ---------- 搜索 ---------- */
+function search(){
+  var q = $("q").value.trim();
+  if(!q){ log("请输入搜索词", "err"); return; }
+  log("搜索：" + q);
+  fetch("/api/search?q=" + encodeURIComponent(q) + "&cookie=" + encodeURIComponent(cookie()))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if(!d.ok){ log("搜索失败：" + (d.error||""), "err"); return; }
+      state.songs = d.songs;
+      renderResults();
+      $("batchPanel").style.display = "block";
+    });
+}
+$("searchBtn").addEventListener("click", search);
+$("q").addEventListener("keydown", function(e){ if(e.key==="Enter") search(); });
+
+function renderResults(){
+  var box = $("results");
+  box.innerHTML = "";
+  state.songs.forEach(function(s, i){
+    var card = document.createElement("div");
+    card.className = "result-card";
+    var img = document.createElement("img");
+    img.src = s.cover || "";
+    img.alt = "";
+    var info = document.createElement("div");
+    info.className = "r-info";
+    var ti = document.createElement("input");
+    ti.value = s.name; ti.title = "歌名（可编辑）";
+    var ar = document.createElement("input");
+    ar.value = s.artist.replace(/\//g, "&"); ar.className = "r-artist"; ar.title = "歌手（可编辑）";
+    info.appendChild(ti); info.appendChild(ar);
+    var chk = document.createElement("input");
+    chk.type = "checkbox"; chk.className = "r-check";
+    var btn = document.createElement("button");
+    btn.className = "btn small"; btn.textContent = "下载";
+    btn.addEventListener("click", function(){
+      downloadOne(s, ti.value, ar.value.replace(/\//g, "&"), btn);
+    });
+    card.appendChild(img); card.appendChild(info); card.appendChild(chk); card.appendChild(btn);
+    box.appendChild(card);
+  });
+}
+
+function downloadOne(s, title, artist, btn, skipLog){
+  if(btn){ btn.disabled = true; btn.textContent = "下载中…"; }
+  log((skipLog?"":"下载 ") + "[" + title + "]");
+  return fetch("/api/download", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: s.id, title: title, artist: artist, cover: s.cover, lrc: true, cookie: cookie()})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if(btn){ btn.disabled = false; btn.textContent = "下载"; }
+      if(d.ok){ log("  ✓ " + d.message, "ok"); }
+      else { log("  ✗ " + d.message, "err"); }
+      refreshPlaylist();
+      return d.ok;
+    })
+    .catch(function(e){
+      if(btn){ btn.disabled = false; btn.textContent = "下载"; }
+      log("  ✗ 请求失败：" + e, "err");
+      return false;
+    });
+}
+
+/* ---------- 批量下载 ---------- */
+function getChecked(){
+  return state.songs.map(function(s, i){
+    var card = $("results").children[i];
+    var inputs = card.querySelectorAll(".r-info input");
+    var chk = card.querySelector(".r-check");
+    if(!chk || !chk.checked) return null;
+    return {s: s, title: inputs[0].value, artist: inputs[1].value.replace(/\//g, "&")};
+  }).filter(Boolean);
+}
+$("downloadSel").addEventListener("click", function(){
+  var sel = getChecked();
+  if(!sel.length){ log("未勾选任何歌曲", "err"); return; }
+  $("downloadSel").disabled = true;
+  var done = 0, ok = 0;
+  $("progFill").style.width = "0%";
+  var btn = null;
+  (function next(){
+    if(done >= sel.length){
+      $("downloadSel").disabled = false;
+      $("batchInfo").textContent = "完成：" + ok + "/" + sel.length;
+      return;
+    }
+    var it = sel[done];
+    $("batchInfo").textContent = "下载中 " + (done+1) + "/" + sel.length + " …";
+    downloadOne(it.s, it.title, it.artist, btn, true).then(function(succ){
+      done++;
+      if(succ) ok++;
+      $("progFill").style.width = (done/sel.length*100) + "%";
+      next();
+    });
+  })();
+});
+$("clearSel").addEventListener("click", function(){
+  var cs = $("results").querySelectorAll(".r-check");
+  for(var i=0;i<cs.length;i++) cs[i].checked = false;
+});
+
+/* ---------- 歌单管理 ---------- */
+function refreshPlaylist(){
+  fetch("/api/playlist").then(function(r){ return r.json(); }).then(function(d){
+    if(!d.ok) return;
+    state.plist = d.items;
+    $("plCount").textContent = "（共 " + state.plist.length + " 首）";
+    var box = $("playlist");
+    box.innerHTML = "";
+    state.plist.forEach(function(it, i){
+      var row = document.createElement("div");
+      row.className = "pl-row";
+      var idx = document.createElement("span");
+      idx.className = "pl-idx"; idx.textContent = it.index;
+      var name = document.createElement("span");
+      name.className = "pl-name";
+      name.textContent = (it.artist ? it.artist + " — " : "") + it.title;
+      var badges = document.createElement("span");
+      badges.className = "pl-badges";
+      if(it.hasLrc) badges.appendChild(badge("歌词"));
+      if(it.hasCover) badges.appendChild(badge("封面"));
+      if(it.hasThumb) badges.appendChild(badge("缩略图"));
+      var up = mkBtn("↑", function(){ move(i, -1); });
+      var down = mkBtn("↓", function(){ move(i, 1); });
+      var del = mkBtn("删", function(){ delSong(it.base); }, "danger small");
+      row.appendChild(idx); row.appendChild(name); row.appendChild(badges);
+      row.appendChild(up); row.appendChild(down); row.appendChild(del);
+      box.appendChild(row);
+    });
+  });
+}
+function badge(t){ var b=document.createElement("span"); b.className="badge"; b.textContent=t; return b; }
+function mkBtn(txt, fn, cls){
+  var b = document.createElement("button");
+  b.className = "btn small" + (cls ? " " + cls : "");
+  b.textContent = txt;
+  b.addEventListener("click", fn);
+  return b;
+}
+function move(i, delta){
+  var j = i + delta;
+  if(j < 0 || j >= state.plist.length) return;
+  var tmp = state.plist[i]; state.plist[i] = state.plist[j]; state.plist[j] = tmp;
+  renderPlaylistRows();
+}
+function renderPlaylistRows(){
+  var box = $("playlist");
+  box.innerHTML = "";
+  state.plist.forEach(function(it, i){
+    var row = document.createElement("div");
+    row.className = "pl-row";
+    var idx = document.createElement("span"); idx.className="pl-idx"; idx.textContent = i;
+    var name = document.createElement("span"); name.className="pl-name";
+    name.textContent = (it.artist ? it.artist + " — " : "") + it.title;
+    var badges = document.createElement("span"); badges.className="pl-badges";
+    if(it.hasLrc) badges.appendChild(badge("歌词"));
+    if(it.hasCover) badges.appendChild(badge("封面"));
+    if(it.hasThumb) badges.appendChild(badge("缩略图"));
+    var up = mkBtn("↑", function(){ move(i, -1); });
+    var down = mkBtn("↓", function(){ move(i, 1); });
+    var del = mkBtn("删", function(){ delSong(it.base); }, "danger small");
+    row.appendChild(idx); row.appendChild(name); row.appendChild(badges);
+    row.appendChild(up); row.appendChild(down); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+function delSong(base){
+  if(!confirm("确认删除：" + base + "？（含 mp3 / lrc / 封面 / 缩略图）")) return;
+  fetch("/api/playlist?base=" + encodeURIComponent(base), {method: "DELETE"})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      log("已删除：" + (d.removed||[]).join(", "));
+      refreshPlaylist();
+    });
+}
+$("saveOrder").addEventListener("click", function(){
+  var order = state.plist.map(function(it){ return it.base; });
+  fetch("/api/playlist/reorder", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({order: order})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    log(d.ok ? "排序已保存" : ("失败：" + d.message), d.ok ? "ok" : "err");
+    refreshPlaylist();
+  });
+});
+$("exportTxt").addEventListener("click", function(){
+  window.open("/api/playlist/export", "_blank");
+});
+$("syncJs").addEventListener("click", function(){
+  fetch("/api/playlist/sync", {method: "POST"}).then(function(r){ return r.json(); })
+    .then(function(d){
+      log(d.message, d.ok ? "ok" : "err");
+      if(d.missing && d.missing.length){
+        d.missing.forEach(function(m){
+          log("  ! " + m.base + " 缺少：" + m.missing.join(" / "), "err");
+        });
+      }
+      refreshPlaylist();
+    })
+    .catch(function(e){ log("同步失败：" + e, "err"); });
+});
+
+refreshPlaylist();
+</script>
+</body>
+</html>

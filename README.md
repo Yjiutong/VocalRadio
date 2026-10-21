@@ -13,7 +13,7 @@ VocalRadio/
 ├─ index.html          # 播放器主页（部署后 / 即此页）
 ├─ radio.html          # 旧链接兼容页，0 秒跳转到 index.html
 ├─ _headers            # Pages 响应头：音频/封面的 CORS 与缓存
-├─ playlist.txt        # 歌单快照（JSON 数组），同时作为接口故障时的兜底
+├─ playlist.txt        # 歌单（JSON 数组）—— 播放器直接读它，这是唯一来源
 ├─ color-thief.min.js  # 封面取色
 ├─ assets/
 │  ├─ main.js          # 播放器逻辑
@@ -23,33 +23,33 @@ VocalRadio/
 │  └─ thumb/           # 封面缩略图，先出低清再换高清
 ├─ lyric/              # 歌词 .lrc
 ├─ music/              # 音频 .mp3（约 167MB）
-└─ worker/             # 后端（Cloudflare Worker + D1）：歌单与点赞计数
+├─ netease-downloader/ # 本地下载器（FastAPI WebUI），加歌与维护歌单
+└─ worker/             # 后端（Worker + D1）：只做点赞/播放计数
    ├─ src/index.js
    ├─ schema.sql
    ├─ wrangler.toml
-   └─ README.md        # 部署与迁移步骤
+   └─ README.md        # 部署步骤
 ```
 
-## 数据来源
+## 歌单与计数分别放在哪
 
-歌曲与点赞/播放计数都在 **D1**（见 `worker/README.md`），Worker 对外只暴露这几个接口：
+| 内容 | 存放位置 | 谁维护 |
+|---|---|---|
+| **歌单** | 仓库根目录 `playlist.txt` | `netease-downloader/` 自动写入 |
+| **点赞 / 播放数** | D1 的 `songs` 表 | Worker 原子累加，行按需创建 |
 
-| 能力 | 接口 |
-|---|---|
-| 歌单 | `GET https://likes.yunjiutong.cn/api/random` → `{ list: [...] }` |
-| 播放数 | `GET /api/play?key=<文件名>` |
-| 点赞 | `GET /api/like?key=`、`GET /api/getLike?key=`、`GET /api/allLikes` |
+播放器直接 `fetch("./playlist.txt")` 拿歌单，**不经过任何接口**；
+点赞才走 `https://likes.yunjiutong.cn`（CORS 为 `*`，本站部署到任何域名都能调）。
 
-该接口的响应头是 `Access-Control-Allow-Origin: *`，所以本站部署在任何域名都能直接调用。
-若日后收紧 CORS，记得把本站域名加进白名单。
-
-**兜底**：远端歌单取不到时，`assets/main.js` 会自动改用同目录的 `playlist.txt`，
-不会出现空白播放器。因此新增歌曲时 **`playlist.txt` 必须一起更新**。
+这样加歌的流程就是：下载器下载 → 自动写回 `playlist.txt` → push。
+**不需要去 Cloudflare 后台或 D1 里手写歌单**；`worker/README.md` 里有更多细节。
 
 ## 新增一首歌
 
-文件名是唯一索引，`parseSongName()` 按 `_` 拆分：`<id>_<歌手>_<曲名>.mp3`。
-**歌手名里不能出现下划线**，曲名可以。同一个 basename 要准备四份文件：
+推荐直接用下载器（`netease-downloader/`），它会自动续号、转封面、写歌单。
+手工添加的话，文件名是唯一索引，`parseSongName()` 按 `_` 拆分：
+`<id>_<歌手>_<曲名>.mp3`，**歌手名里不能出现下划线**，曲名可以。
+同一个 basename 要准备四份文件：
 
 ```
 music/23_歌手_曲名.mp3
@@ -58,19 +58,11 @@ cover/thumb/23_歌手_曲名.png     # 低清缩略图，可缩小到 400px
 lyric/23_歌手_曲名.lrc
 ```
 
-歌曲是否会被播放，由后端 D1 的 `songs` 表决定；仓库里的 `playlist.txt` 只是接口故障时的兜底快照。
-所以两处都要加：
+然后把 `23_歌手_曲名.mp3` 追加进 `playlist.txt` 的数组即可 —— 数据库不用动，
+这首歌第一次被点赞/播放时会自动建行。
 
-```bash
-# 1) 写进后端数据库（否则网页永远播不到这首）
-npx wrangler d1 execute vocalradio --remote --config worker/wrangler.toml \
-  --command "INSERT INTO songs (filename, song_id, singer, title) VALUES ('23_歌手_曲名.mp3','23','歌手','曲名')"
-
-# 2) 同步兜底快照 playlist.txt 的数组
-```
-
-> 部署 Pages 时 `worker/` 目录也会被一起当作静态文件发布（源码可被访问，但不含任何密钥）。
-> 介意的话可以把 `worker/` 拆到单独仓库，本仓库只保留前端。
+> 部署 Pages 时 `worker/` 与 `netease-downloader/` 也会被当作静态文件发布
+> （源码可被访问，但不含任何密钥）。介意的话可以把它们拆到单独仓库。
 
 ## 部署
 

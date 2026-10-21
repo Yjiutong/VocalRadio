@@ -5,10 +5,17 @@ Desktop.ini
 .idea/
 .vscode/
 
-# 部署与构建缓存（wrangler pages deploy 会在本地生成）
+# 部署与构建缓存（wrangler 会在本地生成）
 .wrangler/
 node_modules/
 dist/
+
+# Python（下载器）
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+netease-downloader/tmp/
 
 # 日志与临时文件
 *.log

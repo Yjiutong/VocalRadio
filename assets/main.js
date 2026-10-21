@@ -119,10 +119,11 @@ function parseSongName(rawFileName) {
     };
 }
 
-// 本地歌单兜底：远端 /api/random 不可用时，用同目录的 playlist.txt 继续播。
-// playlist.txt 是远端歌单的完整快照（JSON 数组），新增歌曲时记得同步更新它。
+// 歌单来源：仓库根目录的 playlist.txt（下载器维护，push 到 Pages 即生效）。
+// 播放列表是静态内容，直接读同目录文件就够了 —— 不再依赖远端接口，
+// 也就不需要为了加歌去 Cloudflare 后台或 D1 里手写歌单。
 let localSongList = null;
-async function getLocalSongList() {
+async function getSongList() {
     if (localSongList) return localSongList;
     try {
         const resp = await fetch("./playlist.txt", { cache: "no-store" });
@@ -130,35 +131,18 @@ async function getLocalSongList() {
         const arr = JSON.parse(await resp.text());
         if (Array.isArray(arr) && arr.length) localSongList = arr;
     } catch (e) {
-        console.warn("本地歌单读取失败", e);
+        console.error("读取 playlist.txt 失败", e);
     }
     return localSongList || [];
 }
 
 async function fetchOneRandomSong() {
-    const reqUrl = `${API_BASE}/api/random`;
-    try {
-        const resp = await fetch(reqUrl);
-        if (!resp.ok) throw new Error(`http ${resp.status}`);
-        const resJson = await resp.json();
-        // 真正歌单数组在 resJson.list
-        const songFullList = resJson.list;
-
-        if (!Array.isArray(songFullList) || songFullList.length === 0) {
-            throw new Error("歌单为空或者格式错误");
-        }
-        const rawFileName = songFullList[Math.floor(Math.random() * songFullList.length)];
-        return parseSongName(rawFileName);
-    } catch (e) {
-        // 不再直接返回 null：先用本地歌单兜底，取不到才算失败
-        const local = await getLocalSongList();
-        if (local.length) {
-            console.warn("远端歌单不可用，改用本地 playlist.txt", e);
-            return parseSongName(local[Math.floor(Math.random() * local.length)]);
-        }
-        console.error("fetchOneRandomSong 失败", e);
+    const list = await getSongList();
+    if (!list.length) {
+        console.error("歌单为空：请检查仓库根目录的 playlist.txt");
         return null;
     }
+    return parseSongName(list[Math.floor(Math.random() * list.length)]);
 }
 
 async function fillForwardCache() {
