@@ -118,6 +118,23 @@ Pages 项目 `vocalradio` → Settings → Build：
 npx wrangler pages deploy . --project-name vocalradio
 ```
 
+### 下线独立 Worker（可选，顺序别反）
+
+Pages 跑通之后，`likes.yunjiutong.cn` 那个 Worker 就没用了，可以删。**必须先验证再删**：
+
+1. Pages 部署成功，`/api/songs` 返回 `{"list":[]}`（说明 Functions + D1 绑定都通了）；
+2. 在页面上真点一次赞 → `/api/like` 返回 `count:1` → D1 Console 里
+   `SELECT * FROM songs;` 能看到那一行（说明真的写进库了，不是只返回了个数字）；
+3. 到这一步才去删 Worker。
+
+删的时候注意：
+
+- **KV 命名空间不会跟着 Worker 一起消失**（Worker 和 KV 是两个资源）。
+  想留下历史点赞，先跑 `worker/scripts/migrate-likes-from-kv.sh` 把 KV 倒进 D1；
+  不在乎旧数据就让它留着，以后单独删，反正不占费用。
+- 若提示域名占用，先去 Worker → Settings → Domains & Routes 删掉 `likes.yunjiutong.cn`，再删 Worker。
+- 删完后浏览器里**缓存过的旧 `main.js`** 仍会去请求那个域名，静默失败（`.catch(() => {})`），不影响播放。
+
 ## 与博客的关系
 
 - 页面左上角的「← 返回玖桐博客」硬编码在 `index.html`，目前指向 `https://yunjiutong.cn/`。
