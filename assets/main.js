@@ -39,6 +39,8 @@ const queueToggle = document.querySelector("#queueToggle");
 const queueClose = document.querySelector("#queueClose");
 const queuePanel = document.querySelector("#queuePanel");
 const queueScroll = document.querySelector("#queueScroll");
+const lyricExpandBtn = document.querySelector("#lyricExpand");
+const lyricExpandLabel = document.querySelector("#lyricExpandLabel");
 
 // ---------- 状态 ----------
 let lyricLines = [];
@@ -282,6 +284,35 @@ function closeQueue() {
 
 function toggleQueue() {
   setQueueOpen(!isQueueOpen());
+}
+
+// =============================================================
+// 歌词沉浸视图（歌词卡右下角按钮，可选）
+// =============================================================
+function isLyricsExpanded() {
+  return document.body.classList.contains("is-lyrics-expanded");
+}
+
+/** 高度变了，把当前行重新对到中间 */
+function recenterActiveLyric() {
+  const el = lyricWrap.querySelector(".lyric-line.active");
+  if (el) scrollLyricIntoView(el);
+}
+
+function setLyricsExpanded(on) {
+  if (!lyricExpandBtn || isLyricsExpanded() === on) return;
+  document.body.classList.toggle("is-lyrics-expanded", on);
+  lyricExpandBtn.setAttribute("aria-expanded", on ? "true" : "false");
+  lyricExpandBtn.setAttribute("aria-label", on ? "退出沉浸视图，回到卡片布局" : "展开歌词");
+  lyricExpandBtn.title = on ? "退出沉浸视图" : "展开歌词";
+  lyricExpandLabel.textContent = on ? "收起" : "展开";
+  if (on) closeQueue(); // 展开时把歌单收起来，否则面板会压住歌词
+  // 卡片尺寸换完、过渡跑起来之后再量位置
+  requestAnimationFrame(() => requestAnimationFrame(recenterActiveLyric));
+}
+
+function toggleLyricsExpanded() {
+  setLyricsExpanded(!isLyricsExpanded());
 }
 
 // =============================================================
@@ -644,6 +675,9 @@ function bindEvents() {
     queueToggle.focus(); // 关掉面板后焦点回到触发它的按钮
   });
 
+  // 歌词沉浸视图
+  lyricExpandBtn.addEventListener("click", toggleLyricsExpanded);
+
   // 进度条
   audioPlayer.addEventListener("loadedmetadata", () => {
     timeTotalEl.textContent = fmtTime(audioPlayer.duration);
@@ -729,6 +763,12 @@ function bindEvents() {
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     closeVolumeMenu();
+    // 沉浸视图优先退出，焦点回到右下角那个按钮
+    if (isLyricsExpanded()) {
+      setLyricsExpanded(false);
+      lyricExpandBtn.focus();
+      return;
+    }
     if (!isQueueOpen()) return;
     // 焦点如果还在面板里（含关闭按钮），收起后必须还回触发按钮，
     // 否则焦点会停在一个已经 visibility:hidden 的元素上
@@ -740,6 +780,13 @@ function bindEvents() {
     if (!volumeControl.contains(e.target)) closeVolumeMenu();
     // 点播放器以外的任何地方都收起歌单（点卡片内部不算）
     if (isQueueOpen() && !playerEl.contains(e.target)) closeQueue();
+  });
+
+  // 窗口尺寸变了：当前行重新对中
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(recenterActiveLyric, 150);
   });
 }
 
