@@ -1,22 +1,24 @@
 # 术力口电台后端：Cloudflare Worker + D1
 # 部署：在仓库根目录执行 `npx wrangler deploy --config worker/wrangler.toml`
 
+# ⚠️ 用 CLI 部署时，name 必须改成线上已有 Worker 的名字，
+#    否则会新建一个 Worker，和 likes.yunjiutong.cn 的域名绑定冲突。
+#    （当前线上是网页端创建的 Worker，名字以 Dashboard 为准。）
 name = "vocalradio-api"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
 
 # ── D1 ────────────────────────────────────────────────────────────────
-# 先创建数据库：npx wrangler d1 create vocalradio
-# 再把输出里的 database_id 填到下面（替换全 0 的占位值）。
-# 本地调试（--local）用不到真实 id，可以直接跑。
+# 数据库已在 Cloudflare 后台创建：名称 likes
 [[d1_databases]]
-binding = "DB"
-database_name = "vocalradio"
-database_id = "00000000-0000-0000-0000-000000000000"
+binding = "DB"                                        # 代码里是 env.DB，必须叫 DB
+database_name = "likes"
+database_id = "eb47861e-6df3-4e4e-b8c3-d009a4cdf298"
 
 # ── 域名 ──────────────────────────────────────────────────────────────
-# 原 Worker 用的就是 likes.yunjiutong.cn。
-# 如果该域名已在 Dashboard 里绑定到这个 Worker，删掉下面这段，避免重复声明冲突。
-routes = [
-  { pattern = "likes.yunjiutong.cn", custom_domain = true }
-]
+# likes.yunjiutong.cn 目前已经绑在线上那个 Worker 上（网页端创建的）。
+# 一个自定义域名只能属于一个 Worker，重复声明会在 deploy 时报冲突，
+# 所以这里默认注释掉；只有当你确实要由 CLI 接管域名时才放开。
+# routes = [
+#   { pattern = "likes.yunjiutong.cn", custom_domain = true }
+# ]

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 : "${KV_NAMESPACE_ID:?请先 export KV_NAMESPACE_ID=<旧 KV 命名空间 id>}"
-DB_NAME="${D1_DB_NAME:-vocalradio}"
+DB_NAME="${D1_DB_NAME:-likes}"
 CONFIG="${WRANGLER_CONFIG:-worker/wrangler.toml}"
 PLAYLIST="${PLAYLIST:-playlist.txt}"
 OUT="${OUT_SQL:-$(mktemp -t likes-from-kv-XXXXXX.sql)}"

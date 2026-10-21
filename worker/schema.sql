@@ -1,5 +1,7 @@
 -- VocalRadio 后端数据结构（Cloudflare D1 / SQLite）
--- 一次性执行：wrangler d1 execute vocalradio --remote --config worker/wrangler.toml --file=worker/schema.sql
+-- 一次性执行（数据库名 likes）：
+--   网页端：D1 → likes → Console，粘贴本文件全文执行
+--   命令行：wrangler d1 execute likes --remote --config worker/wrangler.toml --file=worker/schema.sql
 --
 -- 设计要点：
 --   · 歌单不在这里，歌单是仓库根目录的 playlist.txt（前端直接读，下载器负责维护）。

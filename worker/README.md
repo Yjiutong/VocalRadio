@@ -50,21 +50,23 @@ songs(filename PK, likes, plays, updated_at)
 
 ## 首次部署
 
+数据库已建好：**名称 `likes`**，ID `eb47861e-6df3-4e4e-b8c3-d009a4cdf298`，已写入 `wrangler.toml`。
+
+网页端（当前使用）：
+
+1. D1 → `likes` → **Console**，粘贴 `schema.sql` 全文执行；
+2. 现有 Worker → Settings → Bindings → 添加 **D1 database**，变量名 **`DB`**，选 `likes`；
+3. 同一 Worker → Edit code，粘贴 `src/index.js` 全文 → Deploy。
+
+命令行：
+
 ```bash
-# 1. 建库（输出里会有 database_id）
-npx wrangler d1 create vocalradio
+# 建表（库已存在，不要重复 create）
+npx wrangler d1 execute likes --remote --config worker/wrangler.toml --file=worker/schema.sql
 
-# 2. 把 database_id 填进 worker/wrangler.toml
-
-# 3. 建表（只有表结构，没有种子数据）
-npx wrangler d1 execute vocalradio --remote --config worker/wrangler.toml --file=worker/schema.sql
-
-# 4. 部署
+# 部署前先把 wrangler.toml 的 name 改成线上已有 Worker 的名字
 npx wrangler deploy --config worker/wrangler.toml
 ```
-
-域名 `likes.yunjiutong.cn` 若已在 Dashboard 绑到同名 Worker，可把 `wrangler.toml` 里
-`routes` 一段删掉，避免重复声明。
 
 ## 本地验证
 
