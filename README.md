@@ -3,8 +3,6 @@
 VOCALOID 歌曲播放器，带滚动歌词、点赞与封面取色。
 本仓库**根目录就是站点根目录**，整体作为一个 Cloudflare Pages 项目部署。
 
-线上地址：<https://vocalradio.pages.dev>（自定义域名可在 Pages 后台绑）
-所属博客：<https://yunjiutong.cn>
 
 ## 目录结构
 
@@ -119,26 +117,6 @@ Pages 项目 `vocalradio` → Settings → Build：
 ```bash
 npx wrangler pages deploy . --project-name vocalradio
 ```
-
-### 旧后端已清理（2026-10-21）
-
-原来那套「独立 Worker + KV」已经完全退役，仓库里对应文件也已删除：
-
-| 删掉的东西 | 原因 |
-|---|---|
-| `worker/src/index.js` | 独立 Worker 的代码，功能已并入 `functions/api/` |
-| `worker/wrangler.toml` | 只用于 `wrangler deploy` 那个 Worker |
-| `worker/scripts/migrate-likes-from-kv.sh` | KV 已删除，无数据可迁 |
-| `worker/README.md` | 内容合并进本文件 |
-
-线上同时确认：`likes.yunjiutong.cn` 已不可解析（域名随 Worker 一起下线），
-新站 `https://vocalradio.pages.dev/api/*` 全部正常。
-
-> **⚠️ 副作用：博客上的 `/radio/` 现在是坏的。**
-> `https://yunjiutong.cn/radio/radio` 仍在线，但它的 `main.js` 指向已下线的
-> `likes.yunjiutong.cn`，靠 `/api/random` 拿歌单——现在拿不到，选歌会失败。
-> 修法：把博客仓库里那批改动 push 上线，让 `/radio/` 下线、入口改指新站
-> （`tools/set-radio-url.mjs` 已生成好）。
 
 ## 与博客的关系
 
